@@ -1,7 +1,7 @@
 {
   "name": "geo.panoramax",
   "displayName": "Vue immersive Panoramax",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "minGeoVersion": "3.2.0",
   "author": "fallamanche@vienne-condrieu-agglomeration.fr",
   "allowMultiple": false,
