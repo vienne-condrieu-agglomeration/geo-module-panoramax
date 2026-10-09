@@ -28,6 +28,13 @@ angular
         var _NEVER_ASK_KEY = 'geo-panoramax-neverConfirm';
         var _MARKER_ID     = 'geo-panoramax-marker';
         var _markerPlaced  = false;
+        // Cône de vision : cap courant de la vue (degrés, 0 = Nord), dernière position du
+        // marqueur, et file d'attente minimale (un seul remove/add GEO en vol à la fois).
+        var _heading        = null;
+        var _lastLonLat     = null;
+        var _markerBusy     = false;
+        var _markerPending  = false;
+        var _pendingRecenter = false;
         var _FULLSCREEN_BODY_CLASS = 'geo-panoramax-fullscreen-active';
 
         // Scope actif (widget) et référence à l'élément <pnx-viewer> courant
@@ -249,6 +256,49 @@ angular
                             _locateFromMapClick(event.coordinates, event.crs);
                         });
                     }
+
+                    // Cône de vision : "view-rotated" est émis par le sous-composant photo
+                    // (psv) sans bubbling, donc écouté sur lui et pas sur <pnx-viewer>.
+                    if (_viewerEl && _viewerEl.psv) {
+                        _psvEl = _viewerEl.psv;
+                        _psvEl.addEventListener('view-rotated', _onViewRotated);
+                        _psvEl.addEventListener('picture-loaded', _onPictureLoaded);
+                    } else {
+                        console.error('[geo-panoramax] viewer.psv absent : cône de vision désactivé.');
+                    }
+                }
+
+                var _psvEl = null;
+
+                // detail.x = cap de la vue en degrés (0 = Nord, 90 = Est), cf. Photo.js du viewer.
+                // Émis en continu pendant un glisser : on ignore les variations < 3° pour ne
+                // pas saturer la carte GEO de remove/add de marqueur.
+                function _onViewRotated(event) {
+                    var x = event.detail && event.detail.x;
+                    if (typeof x !== 'number' || isNaN(x)) { return; }
+                    x = ((x % 360) + 360) % 360;
+                    if (_heading !== null) {
+                        var delta = Math.abs(x - _heading) % 360;
+                        if (Math.min(delta, 360 - delta) < 3) { return; }
+                    }
+                    _heading = x;
+                    if (_lastLonLat) { _drawMarker(_lastLonLat, false); }
+                }
+
+                // Cap de référence à chaque nouvelle photo : "view-rotated" n'est pas garanti
+                // au chargement, et s'il arrive avant les métadonnées il est calculé avec
+                // l'azimut de la photo précédente (ou 0). "picture-loaded" est émis une fois
+                // les métadonnées chargées, avec le cap corrigé (detail.x) et la position
+                // (detail.lon/lat) : on l'applique sans le filtre des 3°.
+                function _onPictureLoaded(event) {
+                    var d = event.detail || {};
+                    if (typeof d.x !== 'number' || isNaN(d.x)) { return; }
+                    _heading = ((d.x % 360) + 360) % 360;
+                    if (typeof d.lon === 'number' && typeof d.lat === 'number') {
+                        _lastLonLat = [d.lon, d.lat];
+                    }
+                    // Sans recentrage : il est fait par _placeMarkerForPicture (événement select).
+                    if (_lastLonLat) { _drawMarker(_lastLonLat, false); }
                 }
 
                 var _lastProcessedPicId = null;
@@ -304,6 +354,13 @@ angular
                     if (_viewerEl && _selectHandler) {
                         _viewerEl.removeEventListener('select', _selectHandler);
                     }
+                    if (_psvEl) {
+                        _psvEl.removeEventListener('view-rotated', _onViewRotated);
+                        _psvEl.removeEventListener('picture-loaded', _onPictureLoaded);
+                        _psvEl = null;
+                    }
+                    _heading = null;
+                    _lastLonLat = null;
                     if (_pointerClickSub) {
                         _pointerClickSub.unsubscribe();
                         _pointerClickSub = null;
@@ -426,21 +483,50 @@ angular
         // la séquence (précédent/suivant) ou à un clic sur la carte interne Panoramax.
         // ============================================================
         function _placeMarkerAtCoordinates(lonLat) {
+            _lastLonLat = lonLat;
+            _drawMarker(lonLat, true);
+        }
+
+        // (Re)dessine le marqueur (point + cône orienté selon _heading). GEO n'expose pas
+        // de rotation de marqueur : on le supprime et le recrée avec un SVG déjà tourné.
+        // Un seul cycle remove/add à la fois ; les demandes arrivées entre-temps sont
+        // fusionnées et rejouées à la fin avec la dernière position et le dernier cap.
+        function _drawMarker(lonLat, recenter) {
             if (!geoApplication.map) { return; }
+            if (_markerBusy) {
+                _markerPending = true;
+                _pendingRecenter = _pendingRecenter || recenter;
+                return;
+            }
+            _markerBusy = true;
 
             var marker = {
                 id:          _MARKER_ID,
                 position:    { coordinates: lonLat, crs: 'EPSG:4326' },
-                imageUrl:    _MARKER_SVG,
-                size:        { w: 26, h: 26 },
+                imageUrl:    _markerSvg(_heading),
+                size:        { w: 60, h: 60 },
                 positioning: 'center-center',
                 tooltip:     { title: 'Photo Panoramax' }
+            };
+
+            var _done = function () {
+                _markerBusy = false;
+                if (_markerPending) {
+                    var again = _pendingRecenter;
+                    _markerPending = false;
+                    _pendingRecenter = false;
+                    _drawMarker(_lastLonLat, again);
+                }
             };
 
             var _doAdd = function () {
                 geoApplication.map.addMarkers([marker]).subscribe(function () {
                     _markerPlaced = true;
-                    _recenterOnMarker(lonLat);
+                    if (recenter) { _recenterOnMarker(lonLat); }
+                    _done();
+                }, function (err) {
+                    console.error('[geo-panoramax] addMarkers a échoué :', err);
+                    _done();
                 });
             };
 
@@ -507,11 +593,22 @@ angular
             }
         }
 
-        var _MARKER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">' +
-            '<circle cx="13" cy="13" r="11" fill="#1a73e8" stroke="#fff" stroke-width="3"/>' +
-            '<circle cx="13" cy="13" r="4" fill="#fff"/></svg>'
-        );
+        // Marqueur 60x60 centré sur la photo : point bleu + cône de vision (ouverture fixe
+        // de 60°, pointant vers le Nord puis tourné de `heading` degrés autour du centre).
+        // Pas de cône tant que le cap n'est pas connu.
+        // ponytail: ouverture fixe, et carte GEO supposée orientée Nord en haut ; lier
+        // l'ouverture au zoom du viewer (detail.z) ou à la rotation de carte si besoin.
+        function _markerSvg(heading) {
+            var cone = heading === null ? '' :
+                '<path d="M30 30 L15 4.02 A30 30 0 0 1 45 4.02 Z" fill="#1a73e8" fill-opacity="0.35" ' +
+                'stroke="#1a73e8" stroke-width="1.5" transform="rotate(' + heading.toFixed(1) + ' 30 30)"/>';
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">' +
+                cone +
+                '<circle cx="30" cy="30" r="11" fill="#1a73e8" stroke="#fff" stroke-width="3"/>' +
+                '<circle cx="30" cy="30" r="4" fill="#fff"/></svg>'
+            );
+        }
 
         // ============================================================
         // Tour guidé (Shepherd.js)

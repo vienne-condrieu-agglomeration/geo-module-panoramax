@@ -58,6 +58,22 @@ version à l'autre :
 8. **Bouton rond « ouvrir dans Panoramax »** superposé au viewer, visible quand une photo est
    affichée : ouvre `{siteUrl}/?pic={picId}` dans un nouvel onglet (voir « Points à vérifier »).
 9. **Bouton d'aide** : visite guidée (Shepherd.js, AGPL-3.0).
+10. **Cône de vision** sur le marqueur de la carte GEO, orienté selon la direction regardée dans
+    le viewer. Le cap vient des événements du sous-composant photo `viewerEl.psv` (ils ne
+    remontent pas jusqu'à `<pnx-viewer>`) :
+    - `picture-loaded` (detail : `{ x, y, z, picId, lon, lat, first }`) donne le cap de
+      référence à chaque nouvelle photo. `view-rotated` n'est pas garanti au chargement, et
+      s'il arrive avant les métadonnées il est calculé avec l'azimut de la photo précédente ;
+    - `view-rotated` (detail : `{ x, y, z }`) suit ensuite les rotations, en ignorant les
+      variations de moins de 3° (l'événement est émis en continu pendant un glisser).
+
+    `detail.x` est le cap en degrés (0° = Nord), déjà corrigé de `view:azimuth` par le viewer
+    (cf. `Photo.js`, v5.2.0). GEO n'exposant pas de rotation de marqueur, le marqueur est
+    supprimé puis recréé avec un SVG déjà tourné ; un seul cycle `removeMarkers`/`addMarkers`
+    est en vol à la fois, les demandes intermédiaires étant fusionnées. La carte n'est recentrée
+    qu'au changement de photo, pas à la rotation. Limites : ouverture fixe de 60° (ne suit pas
+    le zoom du viewer), carte GEO supposée orientée Nord en haut, et une photo sans
+    `view:azimuth` est traitée comme orientée au Nord. Testé sur GEO (PETR Marennes Oléron).
 
 ## Points à vérifier avant mise en production
 
