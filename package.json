@@ -1,6 +1,6 @@
 {
   "name": "geo-panoramax",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Module GEO d'intégration des vues immersives Panoramax (photos à 360° géolocalisées)",
   "main": "src/js/extension.js",
   "devDependencies": {
