@@ -47,8 +47,9 @@ version à l'autre :
 6. **Marqueur sur la carte GEO** à la position de la photo affichée. Quand l'utilisateur navigue
    dans le viewer (`select`), le marqueur suit (position lue via l'endpoint STAC
    `/collections/{seqId}/items/{picId}`) et la carte est recentrée de façon que le marqueur tombe
-   au milieu de la zone visible (hors panneau). L'événement `select` pouvant arriver deux fois
-   pour une même photo, il est dédoublonné sur `picId`.
+   au milieu de la zone visible (hors panneau), **sans changer le zoom** (`map.centerOn`, voir
+   « Points à vérifier »). L'événement `select` pouvant arriver deux fois pour une même photo,
+   il est dédoublonné sur `picId`.
 7. **Utilisateur privilégié** (config `preferredUser`, `preferredUserCandidates`) :
    `getPicturesAroundCoordinates` ne filtrant pas par utilisateur, le module examine N candidats
    proches et retient le premier dont `providers[].name/id` ou `properties["geovisio:producer"]`
@@ -113,6 +114,19 @@ version à l'autre :
   latérale droite, comme le plugin streetview natif.
 - **`widgets="false"` à éviter** : il supprime aussi les flèches précédent/suivant. On garde les
   widgets par défaut malgré la barre de recherche redondante avec la carte GEO.
+- **Recentrer la carte GEO sans dézoomer : `centerOn`, ni `setExtent` ni `panTo`**. Mesuré en
+  console sur GEO (PETR Marennes Oléron) :
+  - `map.setExtent(emprise courante, crs, { disablePadding: true })` ne restitue pas le zoom :
+    largeur ×1.333 panneau fermé, ×1.5 panneau ouvert. Appelé à chaque photo, il provoquait un
+    dézoom cumulatif (échelle doublée à chaque déplacement dans le viewer) ;
+  - `map.panTo(direction)` décale la carte d'un cran (nord, est…) : passé des coordonnées, il ne
+    fait rien et ne signale aucune erreur ;
+  - `map.centerOn({ coordinates, crs })` déplace le centre exactement, zoom inchangé (ratio de
+    largeur 1.000). Le centre visé est décalé vers l'est de `(0.5 - f) × largeur`, avec
+    `f = (100 - panelWidthPct) / 200`, pour que le marqueur tombe au milieu de la zone visible.
+
+  Pour inspecter l'API carte en console : `angular.element(document.body).injector().get('geoApplication').map`
+  (les signatures minifiées s'obtiennent avec `.toString()` sur chaque méthode).
 
 ## Piège webpack 4 : ne PAS utiliser `@babel/preset-env` sans réglage fin
 

@@ -544,8 +544,8 @@ angular
         // Recentre la carte GEO sur le marqueur en une seule étape, directement décalée
         // pour que le marqueur tombe au centre de la zone visible (hors panneau, à droite) —
         // pas de centerOnMarker() "plein centre" suivi d'un rattrapage (ça provoquait un
-        // flash visible). Conserve le niveau de zoom courant plutôt que de fitter sur un
-        // buffer fixe, précisément pour permettre ce calcul en un seul setExtent().
+        // flash visible). Conserve le niveau de zoom courant : on déplace seulement le
+        // centre via centerOn() (cf. _applyRecenteredExtent).
         function _recenterOnMarker(lonLat) {
             if (!geoApplication.map) { return; }
             var extent = geoApplication.map.extent;
@@ -562,31 +562,30 @@ angular
         }
 
         function _applyRecenteredExtent(currentExtent, markerXY) {
-            var width  = currentExtent.maxX - currentExtent.minX;
-            var height = currentExtent.maxY - currentExtent.minY;
-            if (width <= 0 || height <= 0) { return; }
+            var width = currentExtent.maxX - currentExtent.minX;
+            if (width <= 0) { return; }
 
-            var mapEl      = geoApplication.element;
-            var mapRect    = mapEl ? mapEl.getBoundingClientRect() : null;
-            var mapWidthPx = mapRect ? mapRect.width : window.innerWidth;
+            // Zone visible = tout sauf le panneau (à droite) ; le marqueur doit tomber au
+            // centre de cette zone, soit à la fraction f = (100% - panelWidthPct) / 2 de la
+            // largeur depuis la gauche. Le centre de la carte est donc décalé vers l'est de
+            // (0.5 - f) × largeur par rapport au marqueur.
+            var f = (100 - _panelWidthPct) / 200;
+            var center = [markerXY[0] + (0.5 - f) * width, markerXY[1]];
 
-            // Zone visible = tout sauf le panneau (à droite) ; on cible le centre de cette
-            // zone, soit (100% - panelWidthPct) / 2 depuis la gauche.
-            var visibleFraction = (100 - _panelWidthPct) / 200;
-            var resX    = width / mapWidthPx;
-            var markerX = markerXY[0];
-            var markerY = markerXY[1];
-
-            var newMinX = markerX - visibleFraction * mapWidthPx * resX;
-            var newExtent = {
-                minX: newMinX,
-                maxX: newMinX + width,
-                minY: markerY - height / 2,
-                maxY: markerY + height / 2,
-                crs:  currentExtent.crs
-            };
-
-            geoApplication.map.setExtent(newExtent, newExtent.crs, { disablePadding: true });
+            // centerOn et non setExtent : setExtent ne restitue pas le zoom à l'identique
+            // (même en renvoyant l'emprise courante telle quelle, la largeur ressort ×1.333
+            // panneau fermé, ×1.5 panneau ouvert, malgré disablePadding — mesuré sur GEO),
+            // d'où un dézoom cumulatif à chaque photo. centerOn({coordinates, crs}) déplace
+            // le centre sans toucher au zoom (mesuré : déplacement exact, ratio 1.000).
+            // NB : panTo(direction) ne convient pas, il décale d'un cran (nord, est…) et
+            // ignore silencieusement des coordonnées.
+            var r = geoApplication.map.centerOn({ coordinates: center, crs: currentExtent.crs });
+            // Abonnement au cas où centerOn renvoie un observable froid (comme addMarkers).
+            if (r && typeof r.subscribe === 'function') {
+                r.subscribe(function () {}, function (err) {
+                    console.error('[geo-panoramax] centerOn (recentrage) a échoué :', err);
+                });
+            }
         }
 
         function _removeMarker() {
