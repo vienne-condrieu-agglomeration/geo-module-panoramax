@@ -361,6 +361,10 @@ angular
                     }
                     _heading = null;
                     _lastLonLat = null;
+                    // Un cycle remove/add en vol ne doit pas rejouer un dessin après la fermeture.
+                    _markerBusy = false;
+                    _markerPending = false;
+                    _pendingRecenter = false;
                     if (_pointerClickSub) {
                         _pointerClickSub.unsubscribe();
                         _pointerClickSub = null;
@@ -492,7 +496,7 @@ angular
         // Un seul cycle remove/add à la fois ; les demandes arrivées entre-temps sont
         // fusionnées et rejouées à la fin avec la dernière position et le dernier cap.
         function _drawMarker(lonLat, recenter) {
-            if (!geoApplication.map) { return; }
+            if (!geoApplication.map || !lonLat) { return; }
             if (_markerBusy) {
                 _markerPending = true;
                 _pendingRecenter = _pendingRecenter || recenter;
@@ -596,7 +600,7 @@ angular
         // Marqueur 60x60 centré sur la photo : point bleu + cône de vision (ouverture fixe
         // de 60°, pointant vers le Nord puis tourné de `heading` degrés autour du centre).
         // Pas de cône tant que le cap n'est pas connu.
-        // ponytail: ouverture fixe, et carte GEO supposée orientée Nord en haut ; lier
+        // NB : ouverture fixe, et carte GEO supposée orientée Nord en haut ; lier
         // l'ouverture au zoom du viewer (detail.z) ou à la rotation de carte si besoin.
         function _markerSvg(heading) {
             var cone = heading === null ? '' :
