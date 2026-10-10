@@ -312,7 +312,14 @@ angular
                     var onLink = d && (d.objects || []).some(function (o) {
                         return o.userData && o.userData.tourLink;
                     });
-                    if (!$scope.pointing || !d || d.rightclick || d.marker || onLink) { return; }
+                    if (!$scope.pointing || !d || d.rightclick || d.marker || onLink) {
+                        console.debug('[geo-panoramax] clic ignoré (v' + pluginConf.version + ')', {
+                            pointing: $scope.pointing, rightclick: d && d.rightclick, marker: d && d.marker,
+                            onLink: onLink,
+                            objects: d && (d.objects || []).map(function (o) { return Object.keys(o.userData || {}); })
+                        });
+                        return;
+                    }
                     var meta = _psvEl && _psvEl.getPictureMetadata && _psvEl.getPictureMetadata();
                     console.debug('[geo-panoramax] métadonnées photo', meta);
                     var res = _projectToGround(meta, d.yaw, d.pitch);
