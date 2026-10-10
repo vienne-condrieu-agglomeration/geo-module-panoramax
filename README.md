@@ -147,7 +147,23 @@ Pour tout de même essayer `npm run publish`, installer d'abord le plugin de pub
 
 ---
 
-## 8. Licence et mentions
+## 8. Piste d'évolution : pointer un objet depuis la photo (non réalisée)
+
+**Idée** : en cliquant (et en zoomant) sur la photo Panoramax, poser sur la carte GEO un point géolocalisé en déduisant sa position de la photo, pour relever une grille, un regard d'assainissement, un candélabre, etc. Étudiée le 2026-10-09 ; **rien n'est implémenté ni testé sur de vraies photos**.
+
+Un clic donne une direction (un rayon partant de la caméra), pas un point. Trois façons de le compléter :
+
+| Méthode | Ingrédients | Précision typique |
+|---|---|---|
+| **A. Projection sur le sol** (1 photo) | hauteur de la caméra, ou altitude de la photo moins altitude du terrain | ~0,2 à 1 m à 10 m |
+| **B. Triangulation** (2 photos) | même objet cliqué sur deux photos de la séquence | meilleure, indépendante de la hauteur de caméra |
+| **C. Rayon contre le LiDAR HD** | nuage de points de la dalle | décimétrique au sol |
+
+La précision absolue reste plafonnée par le GPS de la photo (5 m déclarés sur un smartphone). Conception envisagée, limites et questions à trancher avant de commencer : voir [`GUIDE-DEV.md`](GUIDE-DEV.md#piste-dévolution--pointer-un-objet-depuis-la-photo-non-réalisée).
+
+---
+
+## 9. Licence et mentions
 
 - Ce module est publié sous licence **GNU AGPL-3.0 ou ultérieure** : voir [`LICENSE`](LICENSE).
 - Il embarque [Shepherd.js](https://shepherdjs.dev/) (AGPL-3.0, ou licence commerciale par ailleurs), [`@panoramax/web-viewer`](https://gitlab.com/panoramax/server/api) (MIT) et des icônes [Lucide](https://lucide.dev) (ISC).
