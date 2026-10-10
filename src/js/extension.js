@@ -303,12 +303,16 @@ angular
                 // Clic sur la photo en mode pointage : le clic donne une direction (cap +
                 // inclinaison sous l'horizon), complétée par la hauteur de la caméra pour
                 // retomber sur le sol (méthode A de l'issue #9). Ignorés : clic droit, flèches
-                // de navigation (objets 3D) et marqueurs du viewer.
+                // de navigation et marqueurs du viewer.
                 function _onPhotoClick(event) {
                     var d = event.data;
                     console.debug('[geo-panoramax] clic photo', { pointing: $scope.pointing, data: d });
-                    if (!$scope.pointing || !d || d.rightclick || d.marker ||
-                        (d.objects && d.objects.length)) { return; }
+                    // Seules les flèches de navigation (userData.tourLink, plugin virtual-tour)
+                    // sont ignorées : d.objects contient d'autres maillages sur un clic au sol.
+                    var onLink = d && (d.objects || []).some(function (o) {
+                        return o.userData && o.userData.tourLink;
+                    });
+                    if (!$scope.pointing || !d || d.rightclick || d.marker || onLink) { return; }
                     var meta = _psvEl && _psvEl.getPictureMetadata && _psvEl.getPictureMetadata();
                     console.debug('[geo-panoramax] métadonnées photo', meta);
                     var res = _projectToGround(meta, d.yaw, d.pitch);

@@ -82,7 +82,8 @@ version à l'autre :
     sur la carte GEO. Méthode A seule (projection sur le sol) :
     - le clic vient de l'événement `click` de `viewerEl.psv` (Photo Sphere Viewer 5.15, `e.data` :
       `yaw`/`pitch` en radians, `objects`, `marker`, `rightclick`) ; on ignore les clics sur les
-      flèches de navigation et les marqueurs ;
+      flèches de navigation (`objects[].userData.tourLink`) et les marqueurs, mais pas les autres
+      `objects` (un clic au sol en renvoie, constaté) ;
     - cap = `yaw` + `view:azimuth` (comme `getXY()`), distance = hauteur de caméra /
       tan(angle sous l'horizon), position par approximation locale (m/° constants) ;
     - hauteur de caméra = réglage `cameraHeight` (2,5 m par défaut), **supposée**, pas lue dans
