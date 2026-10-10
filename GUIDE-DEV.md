@@ -173,6 +173,57 @@ GEO_ACCESS_TOKEN=xxx npm run publish
 > ⚠️ `npm run publish` renvoie une **erreur 500 du serveur GEO** avec ce module (constatée lors d'un test ; cause probable non confirmée : le bundle fait ~2,9 Mo, contre quelques Ko pour un module classique, et le plugin l'envoie en un seul champ de formulaire). **Importer le ZIP à la main** dans le Générateur est la méthode recommandée.
 > Le plugin n'affiche l'échec que par un `console.log("Error while publishing to GEO", …)` : le build se termine en succès même si la publication échoue.
 
+## Piste d'évolution : pointer un objet depuis la photo (non réalisée)
+
+**Idée** : en cliquant (et en zoomant) sur la photo Panoramax, poser sur la carte GEO un point géolocalisé en
+déduisant sa position de la photo, pour relever une grille, un regard d'assainissement, un candélabre, etc.
+Étudiée le 2026-10-09 ; **rien n'est implémenté ni testé sur de vraies photos**. À reprendre plus tard.
+
+### Ce que le viewer et l'API exposent (lu dans le code, pas encore exploité)
+
+- `<pnx-viewer>.psv` est le viewer Photo Sphere de Panoramax : événement `click` avec les angles yaw / pitch du
+  point cliqué, `getXY()` / `getXYZ()` (orientation et zoom courants), `getPictureMetadata()` (champ de vision
+  horizontal, séquence, photos voisines). Le module accède déjà à `getAPI()` et aux événements `select`.
+- Métadonnées STAC d'une photo (vérifiées sur un item réel) : position (`geometry`), `view:azimuth`,
+  `quality:horizontal_accuracy` (5 m sur un smartphone), `pers:interior_orientation` (focale, dimensions du capteur),
+  EXIF dont `GPSAltitude`.
+
+### Principe
+
+Un clic donne une **direction** (un rayon partant de la caméra), pas un point : il faut le compléter.
+
+| Méthode | Ingrédients | Précision typique | Usage |
+|---|---|---|---|
+| **A. Projection sur le sol** (1 photo) | hauteur de la caméra, ou altitude de la photo moins altitude du terrain (altimétrie IGN) | ~0,2 à 1 m à 10 m | grille, regard (objets au sol) |
+| **B. Triangulation** (2 photos) | cliquer le même objet sur deux photos de la séquence | meilleure, indépendante de la hauteur de caméra | candélabre, objets hors sol |
+| **C. Rayon contre le LiDAR HD** | nuage de points de la dalle (voir `geo-lidar-hd`) | décimétrique au sol | cas exigeants, plus tard |
+
+### Limites à garder en tête
+
+- **La précision absolue est plafonnée par le GPS de la photo** : 5 m déclarés sur la photo inspectée (smartphone).
+  Avec une caméra de relevé à GPS corrigé (IGN, par exemple), c'est bien meilleur. L'écart *relatif* entre objets d'une
+  même séquence est meilleur que l'absolu (erreurs GPS en grande partie communes).
+- L'erreur croît avec la distance : ~30 cm d'erreur sur la hauteur de caméra donnent ~1,2 m à 10 m. Pointer de près,
+  zoomer.
+- L'azimut (`view:azimuth`) est arrondi à quelques degrés selon la source.
+- Photos plates (champ de vision limité) et photos 360° ne se projettent pas pareil : à traiter séparément.
+
+### Conception envisagée
+
+- Bouton **« Pointer »** dans le panneau, avec choix du type d'objet (grille, regard, candélabre…).
+- Clic sur la photo (zoom autorisé) → point sur la carte GEO avec **cercle d'incertitude** et **rayon de visée**
+  depuis la caméra ; second clic sur la photo suivante pour affiner par triangulation ; point déplaçable à la main.
+- Dans un premier temps : marqueur avec attributs (type, coordonnées, incertitude estimée, identifiant de la photo),
+  exportable en GeoJSON / CSV.
+- Enregistrement dans une **couche GEO éditable** (transaction) : seconde étape, non vérifiée, dépend de la
+  configuration de la couche cible.
+
+### Questions à trancher avant de commencer
+
+1. Précision visée : métrique (inventaire) ou décimétrique ? (décimétrique ⇒ photos à GPS corrigé, voire méthode C)
+2. Photos utilisées : captures maison (quelle caméra, GPS corrigé ?) ou couverture publique, souvent au smartphone ?
+3. Destination des points : une couche GEO existante (laquelle ?) ou un simple export ?
+
 ## Annexe : réassigner l'auteur des photos d'un compte Panoramax
 
 Question hors périmètre du module (administration de l'instance Panoramax, pas de l'extension
