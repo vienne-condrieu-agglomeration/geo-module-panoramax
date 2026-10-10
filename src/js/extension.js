@@ -604,6 +604,7 @@ angular
 
             var _done = function () {
                 _markerBusy = false;
+                _bringPointsToFront();
                 if (_markerPending) {
                     var again = _pendingRecenter;
                     _markerPending = false;
@@ -757,6 +758,21 @@ angular
             }]).subscribe(function () {}, function (err) {
                 console.error('[geo-panoramax] addMarkers (point) a échoué :', err);
             });
+        }
+
+        // Le cône est supprimé puis recréé à chaque rotation, donc dessiné au-dessus des points
+        // posés tout près de la caméra (quelques mètres : quelques pixels sous un zoom large).
+        // On redessine les points juste après lui pour qu'ils restent visibles.
+        var _pointsBusy = false;
+        function _bringPointsToFront() {
+            if (!_points.length || _pointsBusy || !geoApplication.map || !_currentScope) { return; }
+            _pointsBusy = true;
+            var _readd = function () {
+                _pointsBusy = false;
+                if (_currentScope) { _points.forEach(_addPointMarker); }
+            };
+            geoApplication.map.removeMarkers(_points.map(function (pt) { return pt.id; }))
+                .subscribe(_readd, _readd);
         }
 
         function _removePointMarkers(points) {
