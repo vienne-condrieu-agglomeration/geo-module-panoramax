@@ -306,24 +306,16 @@ angular
                 // de navigation et marqueurs du viewer.
                 function _onPhotoClick(event) {
                     var d = event.data;
-                    console.debug('[geo-panoramax] clic photo', { pointing: $scope.pointing, data: d });
                     // Seules les flèches de navigation (userData.tourLink, plugin virtual-tour)
                     // sont ignorées : d.objects contient d'autres maillages sur un clic au sol.
                     var onLink = d && (d.objects || []).some(function (o) {
                         return o.userData && o.userData.tourLink;
                     });
                     if (!$scope.pointing || !d || d.rightclick || d.marker || onLink) {
-                        console.debug('[geo-panoramax] clic ignoré (v' + pluginConf.version + ')', {
-                            pointing: $scope.pointing, rightclick: d && d.rightclick, marker: d && d.marker,
-                            onLink: onLink,
-                            objects: d && (d.objects || []).map(function (o) { return Object.keys(o.userData || {}); })
-                        });
                         return;
                     }
                     var meta = _psvEl && _psvEl.getPictureMetadata && _psvEl.getPictureMetadata();
-                    console.debug('[geo-panoramax] métadonnées photo', meta);
                     var res = _projectToGround(meta, d.yaw, d.pitch);
-                    console.debug('[geo-panoramax] projection', res);
                     if (res.error) { _setStatus(res.error); return; }
                     _setStatus(null);
                     var pt = _addPoint(res, meta, $scope.pointInput.type);
@@ -356,7 +348,6 @@ angular
                         _psvEl.addEventListener('view-rotated', _onViewRotated);
                         _psvEl.addEventListener('picture-loaded', _onPictureLoaded);
                         _psvEl.addEventListener('click', _onPhotoClick);
-                        console.debug('[geo-panoramax] écoute du clic photo activée');
                     } else {
                         console.error('[geo-panoramax] viewer.psv absent : cône de vision et pointage désactivés.');
                     }
