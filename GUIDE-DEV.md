@@ -76,6 +76,25 @@ version à l'autre :
     le zoom du viewer), carte GEO supposée orientée Nord en haut, et une photo sans
     `view:azimuth` est traitée comme orientée au Nord. Testé sur GEO (PETR Marennes Oléron).
 
+11. **Pointage d'un objet depuis la photo** (issue #9, **première version, non testée sur de
+    vraies photos ni dans GEO**). Bouton « cible » sous le bouton « ouvrir dans Panoramax » : en
+    mode pointage, un clic sur le **pied** d'un objet au sol (grille, regard…) pose un point
+    sur la carte GEO. Méthode A seule (projection sur le sol) :
+    - le clic vient de l'événement `click` de `viewerEl.psv` (Photo Sphere Viewer 5.15, `e.data` :
+      `yaw`/`pitch` en radians, `objects`, `marker`, `rightclick`) ; on ignore les clics sur les
+      flèches de navigation (`objects[].userData.tourLink`) et les marqueurs, mais pas les autres
+      `objects` (un clic au sol en renvoie, constaté) ;
+    - cap = `yaw` + `view:azimuth` (comme `getXY()`), distance = hauteur de caméra /
+      tan(angle sous l'horizon), position par approximation locale (m/° constants) ;
+    - hauteur de caméra = réglage `cameraHeight` (2,5 m par défaut), **supposée**, pas lue dans
+      la photo ; visée refusée à moins de 2° sous l'horizon ou au-delà de 40 m ;
+    - incertitude = `quality:horizontal_accuracy` (5 m si absent) combinée à ±0,3 m sur la
+      hauteur, affichée en ± m dans la liste et l'infobulle (pas de cercle sur la carte) ;
+    - points gardés en mémoire (perdus au rechargement de la page), exportables en GeoJSON et
+      CSV (`;`, BOM UTF-8). Pas de couche GEO éditable, pas de triangulation, pas de rayon de
+      visée : voir l'issue. Photos plates : `sphereCorrection` (inclinaison de la caméra)
+      ignorée, à vérifier.
+
 ## Points à vérifier avant mise en production
 
 - **Lien « ouvrir dans Panoramax »** : l'URL de l'instance se termine par `/api` (voir ci-dessous),
