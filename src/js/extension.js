@@ -306,10 +306,13 @@ angular
                 // de navigation (objets 3D) et marqueurs du viewer.
                 function _onPhotoClick(event) {
                     var d = event.data;
+                    console.debug('[geo-panoramax] clic photo', { pointing: $scope.pointing, data: d });
                     if (!$scope.pointing || !d || d.rightclick || d.marker ||
                         (d.objects && d.objects.length)) { return; }
                     var meta = _psvEl && _psvEl.getPictureMetadata && _psvEl.getPictureMetadata();
+                    console.debug('[geo-panoramax] métadonnées photo', meta);
                     var res = _projectToGround(meta, d.yaw, d.pitch);
+                    console.debug('[geo-panoramax] projection', res);
                     if (res.error) { _setStatus(res.error); return; }
                     _setStatus(null);
                     var pt = _addPoint(res, meta, $scope.pointInput.type);
@@ -342,6 +345,7 @@ angular
                         _psvEl.addEventListener('view-rotated', _onViewRotated);
                         _psvEl.addEventListener('picture-loaded', _onPictureLoaded);
                         _psvEl.addEventListener('click', _onPhotoClick);
+                        console.debug('[geo-panoramax] écoute du clic photo activée');
                     } else {
                         console.error('[geo-panoramax] viewer.psv absent : cône de vision et pointage désactivés.');
                     }
