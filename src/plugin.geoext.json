@@ -99,6 +99,18 @@
           "required": false,
           "type": "BOOLEAN",
           "defaultValue": true
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Hauteur de la caméra (m)",
+          "description": "Hauteur de la caméra au-dessus du sol, utilisée pour pointer un objet depuis la photo (projection sur le sol). Environ 2,5 m pour un véhicule, 1,5 m pour une prise à pied. Une erreur de 30 cm sur cette valeur donne environ 1,2 m d'erreur à 10 m de distance.",
+          "key": "cameraHeight",
+          "required": false,
+          "type": "NUMBER",
+          "minValue": 0.5,
+          "maxValue": 5,
+          "step": 0.1,
+          "defaultValue": 2.5
         }
       ]
     }

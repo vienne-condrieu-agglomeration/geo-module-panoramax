@@ -24,6 +24,18 @@ angular
         var _registered         = false;
         var _widgetId           = null;
         var _panelWidthPct      = 50;
+        var _cameraHeight       = 2.5;  // m, hauteur de la caméra au-dessus du sol (pointage)
+
+        // Pointage d'objets : points posés depuis la photo, conservés tant que la page vit
+        // (le panneau peut être fermé/rouvert), perdus au rechargement : à exporter.
+        var _POINT_MARKER_PREFIX = 'geo-panoramax-point-';
+        var _POINT_TYPES    = ['Grille', 'Regard', 'Candélabre', 'Autre'];
+        var _POINT_MAX_DIST = 40;   // m, au-delà l'erreur sur la hauteur de caméra dépasse le mètre
+        var _POINT_MIN_PITCH = 2;   // ° sous l'horizon, en deçà la visée est quasi parallèle au sol
+        var _POINT_GPS_DEFAULT = 5; // m, si la photo ne déclare pas quality:horizontal_accuracy
+        var _POINT_HEIGHT_SIGMA = 0.3; // m, incertitude supposée sur la hauteur de caméra
+        var _points         = [];
+        var _pointSeq       = 0;
 
         var _NEVER_ASK_KEY = 'geo-panoramax-neverConfirm';
         var _MARKER_ID     = 'geo-panoramax-marker';
@@ -57,6 +69,7 @@ angular
                 _preferredUserCandidates = parseInt(props.preferredUserCandidates, 10) || _preferredUserCandidates;
                 _toolName         = props.toolName       || _toolName;
                 _confirmBeforeOpen = props.confirmBeforeOpen !== false && props.confirmBeforeOpen !== 'false';
+                _cameraHeight     = parseFloat(props.cameraHeight) || _cameraHeight;
             }
 
             if (!_registered) {
@@ -144,6 +157,10 @@ angular
             minimize: _lucideSvg(
                 '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>' +
                 '<path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>'),
+            crosshair: _lucideSvg(
+                '<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/>' +
+                '<line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/>' +
+                '<line x1="12" x2="12" y1="22" y2="18"/>'),
             help: _lucideSvg(
                 '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>' +
                 '<path d="M12 17h.01"/>')
@@ -185,9 +202,34 @@ angular
                 '    <button class="geo-pnx-help-btn" ng-click="startTour()" title="Aide — visite guidée">',
                 '      ' + _LUCIDE.help,
                 '    </button>',
+                '    <button class="geo-pnx-point-btn" ng-class="{\'geo-pnx-fullscreen-btn--active\': pointing}"',
+                '            ng-click="togglePointing()" ng-disabled="!currentPicId"',
+                '            title="Pointer un objet sur la photo">',
+                '      ' + _LUCIDE.crosshair,
+                '    </button>',
+                '    <div class="geo-pnx-hint" ng-if="pointing">',
+                '      Cliquez sur le <strong>pied</strong> de l\'objet, au sol, pour le placer sur la carte.',
+                '    </div>',
                 '    <div class="geo-pnx-hint" ng-if="!currentPicId && !statusMessage">',
                 '      Cliquez sur la carte pour afficher la photo Panoramax la plus proche.',
                 '    </div>',
+                '  </div>',
+                '  <div class="geo-pnx-points" ng-if="confirmed && (pointing || points.length)">',
+                '    <div class="geo-pnx-points-bar">',
+                '      <label>Type :',
+                '        <select ng-model="pointInput.type" ng-options="t for t in pointTypes"></select>',
+                '      </label>',
+                '      <span class="geo-pnx-points-spacer"></span>',
+                '      <button class="geo-pnx-btn geo-pnx-btn--ghost" ng-disabled="!points.length" ng-click="exportPoints(\'geojson\')">GeoJSON</button>',
+                '      <button class="geo-pnx-btn geo-pnx-btn--ghost" ng-disabled="!points.length" ng-click="exportPoints(\'csv\')">CSV</button>',
+                '      <button class="geo-pnx-btn geo-pnx-btn--ghost" ng-disabled="!points.length" ng-click="clearPoints()">Tout effacer</button>',
+                '    </div>',
+                '    <ul class="geo-pnx-points-list">',
+                '      <li ng-repeat="pt in points">',
+                '        <span>{{ pt.index }}. {{ pt.type }} — ±{{ pt.accuracy }} m</span>',
+                '        <button class="geo-pnx-points-del" ng-click="removePoint(pt)" title="Supprimer ce point">×</button>',
+                '      </li>',
+                '    </ul>',
                 '  </div>',
                 '  <div class="geo-pnx-status" ng-if="statusMessage">{{ statusMessage }}</div>',
                 '</div>'
@@ -209,6 +251,11 @@ angular
                 // Le viewer n'est créé (et Panoramax interrogé) qu'après confirmation éventuelle.
                 $scope.confirmed       = !_confirmBeforeOpen || _isNeverAsk();
                 $scope.declined        = false;
+                $scope.pointing        = false;
+                $scope.points          = _points;
+                $scope.pointTypes      = _POINT_TYPES;
+                // Objet (et non primitive) : le select est dans un ng-if, donc un scope enfant.
+                $scope.pointInput      = { type: _POINT_TYPES[0] };
 
                 var _selectHandler   = null;
                 var _readyHandled    = false;
@@ -239,6 +286,37 @@ angular
 
                 $scope.startTour = function () { _startTour(); };
 
+                $scope.togglePointing = function () { $scope.pointing = !$scope.pointing; };
+
+                $scope.removePoint = function (pt) {
+                    var i = _points.indexOf(pt);
+                    if (i >= 0) { _points.splice(i, 1); }
+                    _removePointMarkers([pt]);
+                };
+
+                $scope.clearPoints = function () {
+                    _removePointMarkers(_points.splice(0, _points.length));
+                };
+
+                $scope.exportPoints = function (format) { _exportPoints(format); };
+
+                // Clic sur la photo en mode pointage : le clic donne une direction (cap +
+                // inclinaison sous l'horizon), complétée par la hauteur de la caméra pour
+                // retomber sur le sol (méthode A de l'issue #9). Ignorés : clic droit, flèches
+                // de navigation (objets 3D) et marqueurs du viewer.
+                function _onPhotoClick(event) {
+                    var d = event.data;
+                    if (!$scope.pointing || !d || d.rightclick || d.marker ||
+                        (d.objects && d.objects.length)) { return; }
+                    var meta = _psvEl && _psvEl.getPictureMetadata && _psvEl.getPictureMetadata();
+                    var res = _projectToGround(meta, d.yaw, d.pitch);
+                    if (res.error) { _setStatus(res.error); return; }
+                    _setStatus(null);
+                    var pt = _addPoint(res, meta, $scope.pointInput.type);
+                    $timeout(function () { $scope.points = _points; });
+                    _addPointMarker(pt);
+                }
+
                 function _onReady() {
                     if (_readyHandled) { return; }
                     _readyHandled = true;
@@ -263,9 +341,12 @@ angular
                         _psvEl = _viewerEl.psv;
                         _psvEl.addEventListener('view-rotated', _onViewRotated);
                         _psvEl.addEventListener('picture-loaded', _onPictureLoaded);
+                        _psvEl.addEventListener('click', _onPhotoClick);
                     } else {
-                        console.error('[geo-panoramax] viewer.psv absent : cône de vision désactivé.');
+                        console.error('[geo-panoramax] viewer.psv absent : cône de vision et pointage désactivés.');
                     }
+                    // Points posés avant une fermeture du panneau : on les redessine.
+                    _points.forEach(_addPointMarker);
                 }
 
                 var _psvEl = null;
@@ -357,6 +438,7 @@ angular
                     if (_psvEl) {
                         _psvEl.removeEventListener('view-rotated', _onViewRotated);
                         _psvEl.removeEventListener('picture-loaded', _onPictureLoaded);
+                        _psvEl.removeEventListener('click', _onPhotoClick);
                         _psvEl = null;
                     }
                     _heading = null;
@@ -373,6 +455,7 @@ angular
                     _viewerEl = null;
                     _currentScope = null;
                     _removeMarker();
+                    _removePointMarkers(_points);
                 });
             }];
         }
@@ -596,6 +679,129 @@ angular
             }
         }
 
+        // ============================================================
+        // Pointage d'objets depuis la photo (issue #9, méthode A : projection sur le sol)
+        // ============================================================
+        var _EARTH_M_PER_DEG = 111320;
+
+        // Direction cliquée (yaw/pitch en radians, repère de la sphère) → position au sol.
+        // Cap absolu = yaw + view:azimuth, comme getXY() du viewer. Distance = hauteur de
+        // caméra / tan(angle sous l'horizon). Incertitude = GPS de la photo combiné à l'erreur
+        // induite sur la distance par l'incertitude de hauteur ; elle croît avec la distance.
+        function _projectToGround(meta, yaw, pitch) {
+            if (!meta || !meta.gps || typeof yaw !== 'number' || typeof pitch !== 'number') {
+                return { error: 'Photo non chargée : pointage impossible.' };
+            }
+            var below = -pitch * 180 / Math.PI;
+            if (below < _POINT_MIN_PITCH) {
+                return { error: 'Visée trop proche de l\'horizon : cliquez sur le sol, plus bas dans la photo.' };
+            }
+            var distance = _cameraHeight / Math.tan(below * Math.PI / 180);
+            if (distance > _POINT_MAX_DIST) {
+                return { error: 'Objet trop loin (' + Math.round(distance) + ' m) : zoomez ou avancez dans la séquence.' };
+            }
+            var props = meta.properties || {};
+            var heading = ((yaw * 180 / Math.PI + (props['view:azimuth'] || 0)) % 360 + 360) % 360;
+            var rad = heading * Math.PI / 180;
+            var camLon = meta.gps[0], camLat = meta.gps[1];
+            var lat = camLat + distance * Math.cos(rad) / _EARTH_M_PER_DEG;
+            var lon = camLon + distance * Math.sin(rad) / (_EARTH_M_PER_DEG * Math.cos(camLat * Math.PI / 180));
+            var gps = props['quality:horizontal_accuracy'];
+            gps = typeof gps === 'number' && gps > 0 ? gps : _POINT_GPS_DEFAULT;
+            var fromHeight = distance * _POINT_HEIGHT_SIGMA / _cameraHeight;
+            return {
+                lon: lon, lat: lat, distance: distance, heading: heading,
+                accuracy: Math.sqrt(gps * gps + fromHeight * fromHeight),
+                camLon: camLon, camLat: camLat
+            };
+        }
+
+        function _addPoint(res, meta, type) {
+            var pt = {
+                id:       _POINT_MARKER_PREFIX + (++_pointSeq),
+                index:    _pointSeq,
+                type:     type,
+                lon:      res.lon,
+                lat:      res.lat,
+                accuracy: Math.round(res.accuracy * 10) / 10,
+                distance: Math.round(res.distance * 10) / 10,
+                heading:  Math.round(res.heading),
+                camLon:   res.camLon,
+                camLat:   res.camLat,
+                picId:    meta.id || null,
+                seqId:    (meta.sequence && meta.sequence.id) || null,
+                date:     new Date().toISOString()
+            };
+            _points.push(pt);
+            return pt;
+        }
+
+        function _addPointMarker(pt) {
+            if (!geoApplication.map) { return; }
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">' +
+                '<circle cx="14" cy="14" r="9" fill="#d93025" fill-opacity="0.85" stroke="#fff" stroke-width="3"/>' +
+                '<circle cx="14" cy="14" r="2.5" fill="#fff"/></svg>';
+            geoApplication.map.addMarkers([{
+                id:          pt.id,
+                position:    { coordinates: [pt.lon, pt.lat], crs: 'EPSG:4326' },
+                imageUrl:    'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+                size:        { w: 28, h: 28 },
+                positioning: 'center-center',
+                tooltip:     { title: pt.index + '. ' + pt.type + ' (±' + pt.accuracy + ' m)' }
+            }]).subscribe(function () {}, function (err) {
+                console.error('[geo-panoramax] addMarkers (point) a échoué :', err);
+            });
+        }
+
+        function _removePointMarkers(points) {
+            if (!points.length || !geoApplication.map) { return; }
+            geoApplication.map.removeMarkers(points.map(function (pt) { return pt.id; }))
+                .subscribe(function () {}, function () {});
+        }
+
+        function _download(filename, mime, content) {
+            var blob = new Blob([content], { type: mime });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        }
+
+        function _exportPoints(format) {
+            if (!_points.length) { return; }
+            var stamp = new Date().toISOString().slice(0, 10);
+            if (format === 'geojson') {
+                _download('panoramax-points-' + stamp + '.geojson', 'application/geo+json', JSON.stringify({
+                    type: 'FeatureCollection',
+                    features: _points.map(function (pt) {
+                        return {
+                            type: 'Feature',
+                            geometry: { type: 'Point', coordinates: [pt.lon, pt.lat] },
+                            properties: {
+                                type: pt.type, incertitude_m: pt.accuracy, distance_camera_m: pt.distance,
+                                cap: pt.heading, hauteur_camera_m: _cameraHeight, photo: pt.picId,
+                                sequence: pt.seqId, date_pointage: pt.date
+                            }
+                        };
+                    })
+                }, null, 2));
+                return;
+            }
+            // CSV séparé par des points-virgules (ouverture directe dans Excel en français),
+            // avec BOM UTF-8 pour les accents.
+            var rows = [['type', 'lon', 'lat', 'incertitude_m', 'distance_camera_m', 'cap',
+                         'hauteur_camera_m', 'photo', 'sequence', 'date_pointage']];
+            _points.forEach(function (pt) {
+                rows.push([pt.type, pt.lon.toFixed(7), pt.lat.toFixed(7), pt.accuracy, pt.distance,
+                           pt.heading, _cameraHeight, pt.picId || '', pt.seqId || '', pt.date]);
+            });
+            _download('panoramax-points-' + stamp + '.csv', 'text/csv;charset=utf-8',
+                '\ufeff' + rows.map(function (r) { return r.join(';'); }).join('\r\n'));
+        }
+
         // Marqueur 60x60 centré sur la photo : point bleu + cône de vision (ouverture fixe
         // de 60°, pointant vers le Nord puis tourné de `heading` degrés autour du centre).
         // Pas de cône tant que le cap n'est pas connu.
@@ -698,6 +904,24 @@ angular
                 '.geo-pnx-fullscreen-btn--active{background:#1a73e8;color:#fff;',
                 '  border-color:#1a73e8;}',
                 '.geo-pnx-fullscreen-btn--active:hover{background:#1558b0;}',
+
+                // Bouton de pointage, sous le bouton « ouvrir dans Panoramax »
+                '.geo-pnx-point-btn{position:absolute;right:12px;top:210px;z-index:5;',
+                '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
+                '  background:rgb(255,255,255);cursor:pointer;display:flex;color:#444;padding:0;',
+                '  align-items:center;justify-content:center;}',
+                '.geo-pnx-point-btn:disabled{opacity:.5;cursor:default;}',
+                '.geo-pnx-point-btn.geo-pnx-fullscreen-btn--active{background:#1a73e8;color:#fff;',
+                '  border-color:#1a73e8;}',
+                '.geo-pnx-points{flex-shrink:0;border-top:1px solid #ddd;background:#f7f7f7;',
+                '  font-size:12px;}',
+                '.geo-pnx-points-bar{display:flex;align-items:center;gap:6px;padding:6px 12px;flex-wrap:wrap;}',
+                '.geo-pnx-points-spacer{flex:1;}',
+                '.geo-pnx-points-list{list-style:none;margin:0;padding:0 12px 6px;max-height:110px;',
+                '  overflow-y:auto;}',
+                '.geo-pnx-points-list li{display:flex;justify-content:space-between;align-items:center;',
+                '  padding:2px 0;}',
+                '.geo-pnx-points-del{border:none;background:none;cursor:pointer;font-size:16px;color:#666;}',
 
                 // Bouton d'aide, sous le bouton plein écran
                 '.geo-pnx-help-btn{position:absolute;right:12px;top:110px;z-index:5;',
