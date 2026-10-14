@@ -482,20 +482,31 @@ angular
         // Coche/décoche le groupe de couches _layerGroupName dans la légende GEO, en cliquant
         // sa case « œil » (ng-click GEO) seulement si son état diffère de celui voulu.
         // setTimeout et pas $timeout : le clic déclenche un $apply GEO, interdit pendant un digest.
+        // Un clic unique à l'ouverture restait sans effet (constaté sur GEO, alors que le même
+        // clic lancé à la main en console fonctionne) : on vérifie donc l'état et on réessaie
+        // jusqu'à ce que la case soit dans l'état voulu, pendant quelques secondes au plus.
         // ponytail: passe par le DOM de la légende, faute d'API GEO de couches connue ; sans
         // effet si la légende n'est pas rendue. Remplacer par l'API si GEO en expose une.
+        var _layerTimer = null;
         function _setLayerGroupVisible(visible) {
             if (!_layerGroupName) { return; }
             var wanted = _layerGroupName.toLowerCase();
-            setTimeout(function () {
+            var tries  = 20; // 20 × 300 ms = 6 s
+            clearTimeout(_layerTimer); // une demande plus récente (fermeture) remplace l'ancienne
+            function attempt() {
+                var done   = false;
                 var labels = document.querySelectorAll('[id^="id-thematic-group-item-label-"]');
                 for (var i = 0; i < labels.length; i++) {
                     if (labels[i].textContent.trim().toLowerCase() !== wanted) { continue; }
                     var box = document.querySelector('.acf-thematic-layer-visibility-checkbox-label' +
                                                      '[aria-labelledby="' + labels[i].id + '"]');
-                    if (box && (box.getAttribute('aria-checked') === 'true') !== visible) { box.click(); }
+                    if (!box) { continue; }
+                    if ((box.getAttribute('aria-checked') === 'true') === visible) { done = true; }
+                    else { box.click(); }
                 }
-            }, 0);
+                if (!done && --tries > 0) { _layerTimer = setTimeout(attempt, 300); }
+            }
+            _layerTimer = setTimeout(attempt, 0);
         }
 
         function _setStatus(message) {
