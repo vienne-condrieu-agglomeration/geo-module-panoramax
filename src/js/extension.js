@@ -21,6 +21,7 @@ angular
         var _preferredUserCandidates = 20;
         var _toolName           = 'Panoramax';
         var _confirmBeforeOpen  = true;
+        var _layerGroupName     = 'Panoramax'; // groupe de couches GEO affiché tant que le panneau est ouvert
         var _registered         = false;
         var _widgetId           = null;
         var _panelWidthPct      = 50;
@@ -57,6 +58,8 @@ angular
                 _preferredUserCandidates = parseInt(props.preferredUserCandidates, 10) || _preferredUserCandidates;
                 _toolName         = props.toolName       || _toolName;
                 _confirmBeforeOpen = props.confirmBeforeOpen !== false && props.confirmBeforeOpen !== 'false';
+                // Vide = désactivé ; absent (config antérieure au réglage) = valeur par défaut.
+                _layerGroupName   = (props.layerGroupName == null ? _layerGroupName : String(props.layerGroupName)).trim() || null;
             }
 
             if (!_registered) {
@@ -200,6 +203,7 @@ angular
         function _buildController() {
             return ['$scope', '$element', function ($scope, $element) {
                 _currentScope = $scope;
+                _setLayerGroupVisible(true);
                 _panelWidthPct = 50; // état par défaut à chaque (re)ouverture du panneau
 
                 $scope.currentPicId    = null;
@@ -373,6 +377,7 @@ angular
                     _viewerEl = null;
                     _currentScope = null;
                     _removeMarker();
+                    _setLayerGroupVisible(false);
                 });
             }];
         }
@@ -472,6 +477,25 @@ angular
                     }
                 })
                 .catch(function () { /* la position du marqueur n'est qu'indicative */ });
+        }
+
+        // Coche/décoche le groupe de couches _layerGroupName dans la légende GEO, en cliquant
+        // sa case « œil » (ng-click GEO) seulement si son état diffère de celui voulu.
+        // setTimeout et pas $timeout : le clic déclenche un $apply GEO, interdit pendant un digest.
+        // ponytail: passe par le DOM de la légende, faute d'API GEO de couches connue ; sans
+        // effet si la légende n'est pas rendue. Remplacer par l'API si GEO en expose une.
+        function _setLayerGroupVisible(visible) {
+            if (!_layerGroupName) { return; }
+            var wanted = _layerGroupName.toLowerCase();
+            setTimeout(function () {
+                var labels = document.querySelectorAll('[id^="id-thematic-group-item-label-"]');
+                for (var i = 0; i < labels.length; i++) {
+                    if (labels[i].textContent.trim().toLowerCase() !== wanted) { continue; }
+                    var box = document.querySelector('.acf-thematic-layer-visibility-checkbox-label' +
+                                                     '[aria-labelledby="' + labels[i].id + '"]');
+                    if (box && (box.getAttribute('aria-checked') === 'true') !== visible) { box.click(); }
+                }
+            }, 0);
         }
 
         function _setStatus(message) {

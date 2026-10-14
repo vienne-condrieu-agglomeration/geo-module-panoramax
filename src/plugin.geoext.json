@@ -99,6 +99,15 @@
           "required": false,
           "type": "BOOLEAN",
           "defaultValue": true
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Groupe de couches à afficher",
+          "description": "Nom (tel qu'affiché dans la légende) du groupe de couches GEO coché à l'ouverture du panneau Panoramax et décoché à sa fermeture. Laisser vide pour ne pas toucher aux couches.",
+          "key": "layerGroupName",
+          "required": false,
+          "type": "STRING",
+          "defaultValue": "Panoramax"
         }
       ]
     }

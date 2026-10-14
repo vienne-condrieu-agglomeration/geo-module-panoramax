@@ -75,6 +75,12 @@ version à l'autre :
     qu'au changement de photo, pas à la rotation. Limites : ouverture fixe de 60° (ne suit pas
     le zoom du viewer), carte GEO supposée orientée Nord en haut, et une photo sans
     `view:azimuth` est traitée comme orientée au Nord. Testé sur GEO (PETR Marennes Oléron).
+11. **Groupe de couches GEO** (config `layerGroupName`, défaut `Panoramax`, vide = désactivé) :
+    coché à l'ouverture du panneau, décoché à sa fermeture (`$destroy`). Faute d'API GEO de
+    couches connue, le module clique la case « œil » de la légende
+    (`.acf-thematic-layer-visibility-checkbox-label`, reliée par `aria-labelledby` au libellé
+    `#id-thematic-group-item-label-…` dont le texte vaut le nom du groupe), seulement si
+    `aria-checked` diffère de l'état voulu. Sans effet si la légende n'est pas rendue.
 
 ## Points à vérifier avant mise en production
 
