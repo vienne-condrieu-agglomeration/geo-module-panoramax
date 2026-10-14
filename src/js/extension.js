@@ -313,6 +313,10 @@ angular
                     // (une fois pour la séquence, une fois pour la photo) : ne replacer le
                     // marqueur (et donc ne recentrer/décaler la carte) qu'une seule fois.
                     if (detail.picId && detail.seqId && detail.picId !== _lastProcessedPicId) {
+                        // Sans photo au démarrage, le viewer affiche la carte en grand et ne
+                        // repasse pas sur la photo à la première sélection : on le fait ici,
+                        // une seule fois (ensuite, le choix carte/photo de l'utilisateur prime).
+                        if (_lastProcessedPicId === null) { _viewerEl.setAttribute('focus', 'pic'); }
                         _lastProcessedPicId = detail.picId;
                         _placeMarkerForPicture(detail.seqId, detail.picId);
                     }
