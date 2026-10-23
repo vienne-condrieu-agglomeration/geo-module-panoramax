@@ -147,6 +147,15 @@ Pour tout de même essayer `npm run publish`, installer d'abord le plugin de pub
 
 ---
 
+## Journal des nouveautés
+
+`CHANGELOG.md` (Keep a Changelog, en français, pour les utilisateurs) est embarqué dans le module : le lien « v… · Nouveautés » en bas du panneau ouvre une fenêtre qui
+le montre, avec un point rouge tant que la dernière version n'a pas été lue. Les fichiers `src/js/changelog.js`, `scripts/check-version.js` et `test/changelog.test.mjs`
+viennent du gabarit de module des projets GEO de la collectivité (ne pas les modifier ici). `npm test` et `npm run package` vérifient que `package.json`, `src/plugin.geoext.json` et le
+premier `## [x.y.z]` du journal portent la même version : les trois s'écrivent dans le même commit de release.
+
+---
+
 ## 8. Licence et mentions
 
 - Ce module est publié sous licence **GNU AGPL-3.0 ou ultérieure** : voir [`LICENSE`](LICENSE).

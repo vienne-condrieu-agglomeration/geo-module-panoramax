@@ -16,6 +16,7 @@
     "archiver": "^5.3.1",
     "babel-loader": "^8.4.1",
     "css-loader": "^3.2.0",
+    "raw-loader": "^4.0.2",
     "style-loader": "^1.0.0",
     "url-loader": "^2.3.0",
     "webpack": "^4.42.1",
@@ -24,10 +25,11 @@
   "scripts": {
     "build": "webpack",
     "watch": "webpack --watch",
-    "package": "npm run build && node scripts/package.js",
+    "package": "npm run check:version && npm run build && node scripts/package.js",
     "publish": "webpack --config webpack.publish.config.js",
     "publish:watch": "webpack --watch --config webpack.publish.config.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run check:version && node test/changelog.test.mjs",
+    "check:version": "node scripts/check-version.js"
   },
   "keywords": [
     "geo",

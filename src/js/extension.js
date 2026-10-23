@@ -1,6 +1,8 @@
 import angular from "angular";
 import pluginConf from '../plugin.geoext.json';
 import { driver } from 'driver.js';
+import { createChangelog } from './changelog.js';
+import changelogMd from '../../CHANGELOG.md';
 import 'driver.js/dist/driver.css';
 
 // Enregistre les web components <pnx-viewer>, <pnx-photo-viewer>, etc.
@@ -19,6 +21,12 @@ angular
         var _searchRadius      = 0.0005;
         var _preferredUser          = null; // nom d'utilisateur ou UUID, insensible à la casse
         var _preferredUserCandidates = 20;
+        // Journal des nouveautés : lien en bas du panneau, point rouge tant que la version n'a pas été lue
+        var changelog = createChangelog({
+            name: pluginConf.name, title: pluginConf.displayName, version: pluginConf.version,
+            markdown: changelogMd, prefix: 'geo-pnx'
+        });
+
         var _toolName           = 'Panoramax';
         var _confirmBeforeOpen  = true;
         var _layerGroupName     = 'Panoramax'; // groupe de couches GEO affiché tant que le panneau est ouvert
@@ -238,6 +246,7 @@ angular
                 '    </ul>',
                 '  </div>',
                 '  <div class="geo-pnx-status" ng-if="statusMessage">{{ statusMessage }}</div>',
+                '  <div class="geo-pnx-foot">' + changelog.linkHtml() + '</div>',
                 '</div>'
             ].join('\n');
         }
@@ -295,6 +304,13 @@ angular
                 };
 
                 $scope.startTour = function () { _startTour(); };
+
+                // Lien « Nouveautés » : clic délégué (le gabarit est du HTML brut) ; le gabarit est construit une
+                // fois, le point rouge est donc remis à jour à chaque ouverture du panneau.
+                $element[0].addEventListener('click', function (e) {
+                    if (e.target.closest && e.target.closest('[data-changelog]')) { changelog.open(); }
+                });
+                $timeout(function () { changelog.refresh(); });
 
                 $scope.togglePointing = function () { $scope.pointing = !$scope.pointing; };
 
@@ -1263,6 +1279,7 @@ angular
                 // zoom/géoloc/permalien (topleft). On le masque tant que c'est le cas.
                 'body.' + _FULLSCREEN_BODY_CLASS + ' .acf-map-controls-topright{display:none!important;}',
 
+                '.geo-pnx-foot{flex-shrink:0;padding:4px 12px;border-top:1px solid #e3e6e0;text-align:right;background:#fff;}',
                 '.geo-pnx-status{padding:8px 12px;font-size:12px;color:#666;background:#f7f7f7;',
                 '  border-top:1px solid #ddd;flex-shrink:0;}',
                 // En bas (pas en haut : Panoramax y affiche ses propres contrôles/messages
