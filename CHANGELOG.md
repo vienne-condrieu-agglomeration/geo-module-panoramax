@@ -11,6 +11,8 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.8.1] — 2026-10-23
+
 ### Ajouté
 
 - Infobulle immédiate au survol de chaque bouton flottant du viewer (plein écran, ouvrir dans Panoramax, pointage,
