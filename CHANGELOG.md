@@ -11,6 +11,8 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.8.0] — 2026-10-23
+
 ### Modifié
 
 - Le journal des nouveautés s'ouvre avec un bouton flottant (étincelles, sous le bouton de pointage) au lieu d'un
