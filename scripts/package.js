@@ -2,7 +2,7 @@
  * Génère le fichier ZIP livrable pour import dans le générateur GEO.
  *
  * Structure du ZIP produit :
- *   geo-panoramax.zip
+ *   geo-panoramax_AAAAMMJJ-HHMM.zip
  *   ├── plugin.geoext.json    (métadonnées du module)
  *   ├── main.js               (bundle webpack compilé)
  *   └── assets/
@@ -17,7 +17,9 @@ const archiver = require("archiver");
 
 const ROOT     = path.join(__dirname, "..");
 const DIST     = path.join(ROOT, "dist");
-const OUTPUT   = path.join(ROOT, "geo-panoramax.zip");
+// Nom daté (AAAAMMJJ-HHMM) : GEO refuse de réimporter un ZIP portant un nom déjà importé.
+const STAMP    = new Date().toISOString().slice(0, 16).replace(/-|:/g, "").replace("T", "-");
+const OUTPUT   = path.join(ROOT, `geo-panoramax_${STAMP}.zip`);
 
 // Vérification que le build existe
 if (!fs.existsSync(path.join(DIST, "main.js"))) {
