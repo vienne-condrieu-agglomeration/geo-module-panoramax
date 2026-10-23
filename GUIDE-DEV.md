@@ -72,7 +72,7 @@ version à l'autre :
      depuis les gestionnaires existants :
      clic sur la carte (`pointerClick` **puis** `select` d'une nouvelle photo : la photo du
      centre sélectionnée automatiquement à l'ouverture ne compte pas), rotation cumulée ≥ 30°
-     (`view-rotated`), photo suivante (`select`). Chaque étape a « Passer cette étape ».
+     (`view-rotated`), photo suivante (`select`). « Suivant » passe une étape dont le geste n'aboutit pas.
    - **Visite non modale** : Driver.js voile la page et bloque tout clic hors de l'élément visé
      (`body.driver-active * { pointer-events: none }`), ce qui empêcherait de cliquer sur la carte
      GEO, justement le geste à apprendre. Le module règle `overlayOpacity: 0`, masque le SVG du
@@ -81,10 +81,14 @@ version à l'autre :
      Driver.js change ces noms de classes, c'est le seul endroit à revoir.
    - **Clavier** : les étapes ne déclarent que `showButtons: ['close']`, donc Driver ignore ← →
      (qui feraient sauter les étapes interactives, la bulle prenant le focus). Les boutons natifs
-     de Driver sont masqués, les nôtres (`step.data.buttons`) disent ce qui est mémorisé ; pas de
-     croix, Échap ferme sans rien mémoriser.
-   - **Mémorisation** : clé `localStorage` `geo-panoramax-tour` = `v1:done` (Terminer ou Passer
-     la visite) ou `v1:never` (Ne plus afficher). Seuls ces boutons écrivent. Fermer le panneau
+     de Driver sont masqués, les nôtres (`step.data.buttons`) disent ce qui est mémorisé. La
+     visite a deux boutons « ‹ Précédent » / « Suivant › » (`movePrevious` / `moveNext`) et une
+     croix en haut à droite (`closeButton` de Driver, étapes `data.closable`) qui ferme et mémorise
+     `v1:done` ; l'accroche n'a pas de croix. Échap ferme sans rien mémoriser. Revenir en arrière
+     sur « Cliquez sur la carte » repose le point d'ancrage : Driver résout l'élément de l'étape
+     d'arrivée avant de désélectionner l'étape de départ, donc seule cette étape retire le point.
+   - **Mémorisation** : clé `localStorage` `geo-panoramax-tour` = `v1:done` (Terminer, ou croix
+     de fermeture) ou `v1:never` (Ne plus afficher). Seuls ces boutons écrivent. Fermer le panneau
      en pleine visite n'écrit rien : elle reprend au début à la prochaine ouverture. Passer
      `_TOUR_VERSION` à `v2` réaffiche la visite une fois pour tout le monde.
    - **Accroche ancrée sur l'icône elle-même** (la plus à droite parmi les `.icon_panoramax`
@@ -208,7 +212,7 @@ Pas de tests automatisés : le code dépend de GEO et du viewer. En console, vid
 - [ ] Étapes plein écran / ouvrir dans Panoramax : cliquer sur le bouton désigné avance ;
       dernière étape : cliquer sur « ? » termine la visite (rien ne réapparaît ensuite).
 - [ ] La bulle d'accroche pointe bien l'onglet Panoramax de la barre de droite.
-- [ ] Terminer, ou Passer la visite → recharger : ni accroche ni visite ; « ? » relance la visite.
+- [ ] Terminer, ou fermer par la croix → recharger : ni accroche ni visite ; « ? » relance la visite.
 - [ ] Ne plus afficher (accroche ou visite) → recharger : rien ne réapparaît.
 - [ ] Fermer le panneau en pleine visite → rouvrir : la visite reprend au début.
 - [ ] `showTourOnStart` décoché dans le Générateur : ni accroche ni visite auto ; « ? » marche.

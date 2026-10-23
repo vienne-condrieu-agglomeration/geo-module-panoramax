@@ -175,6 +175,9 @@ angular
                 '<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/>' +
                 '<line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/>' +
                 '<line x1="12" x2="12" y1="22" y2="18"/>'),
+            sparkles: _lucideSvg(
+                '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>' +
+                '<path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>'),
             help: _lucideSvg(
                 '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>' +
                 '<path d="M12 17h.01"/>')
@@ -221,6 +224,11 @@ angular
                 '            title="Pointer un objet sur la photo">',
                 '      ' + _LUCIDE.crosshair,
                 '    </button>',
+                // Nouveautés du module : bouton flottant comme les autres (le viewer garde toute la hauteur)
+                '    <button class="geo-pnx-changelog-btn" ng-click="openChangelog()" title="{{ changelogTitle }}" aria-label="Nouveautés du module">',
+                '      ' + _LUCIDE.sparkles,
+                '      <i class="geo-pnx-dot-new" ng-if="changelogNew()"></i>',
+                '    </button>',
                 '    <div class="geo-pnx-hint" ng-if="pointing">',
                 '      Cliquez sur le <strong>pied</strong> de l\'objet, au sol, pour le placer sur la carte.',
                 '    </div>',
@@ -246,7 +254,6 @@ angular
                 '    </ul>',
                 '  </div>',
                 '  <div class="geo-pnx-status" ng-if="statusMessage">{{ statusMessage }}</div>',
-                '  <div class="geo-pnx-foot">' + changelog.linkHtml() + '</div>',
                 '</div>'
             ].join('\n');
         }
@@ -305,12 +312,10 @@ angular
 
                 $scope.startTour = function () { _startTour(); };
 
-                // Lien « Nouveautés » : clic délégué (le gabarit est du HTML brut) ; le gabarit est construit une
-                // fois, le point rouge est donc remis à jour à chaque ouverture du panneau.
-                $element[0].addEventListener('click', function (e) {
-                    if (e.target.closest && e.target.closest('[data-changelog]')) { changelog.open(); }
-                });
-                $timeout(function () { changelog.refresh(); });
+                // Bouton « Nouveautés » : le point rouge disparaît une fois le journal ouvert.
+                $scope.changelogTitle = 'Nouveautés du module' + (changelog.current ? ' (v' + changelog.current + ')' : '');
+                $scope.changelogNew   = function () { return changelog.hasNew(); };
+                $scope.openChangelog  = function () { changelog.open(); };
 
                 $scope.togglePointing = function () { $scope.pointing = !$scope.pointing; };
 
@@ -958,6 +963,7 @@ angular
                 smoothScroll:   false,
                 popoverClass:   'geo-pnx-tour',
                 popoverOffset:  12,
+                closeBtnLabel:  'Fermer la visite',
                 onPopoverRender: _renderPopover
             };
             for (var k in (extra || {})) { o[k] = extra[k]; }
@@ -974,9 +980,11 @@ angular
         function _renderPopover(popover, opts) {
             var step = opts.state.activeStep;
             var data = (step && step.data) || {};
-            [popover.closeButton, popover.previousButton, popover.nextButton, popover.progress].forEach(function (el) {
+            // Croix de fermeture seulement sur la visite (data.closable) ; boutons précédent / suivant natifs masqués.
+            [popover.previousButton, popover.nextButton, popover.progress].forEach(function (el) {
                 if (el) { el.style.display = 'none'; }
             });
+            if (popover.closeButton) { popover.closeButton.style.display = data.closable ? 'block' : 'none'; }
             if (data.count) {
                 var count = document.createElement('div');
                 count.className = 'geo-pnx-tour-count';
@@ -1127,22 +1135,24 @@ angular
             _cancelTeaser();
 
             var tour = _tour = driver(_tourOptions({
+                // Croix : l'agent écarte la visite, elle ne revient plus d'elle-même (le « ? » la relance).
+                onCloseClick: function () { _setTourState('done'); tour.destroy(); },
                 onDestroyed: function () {
                     _tourWaiting = null;
                     _hideMapAnchor();
                     if (_tour === tour) { _tour = null; }
                 }
             }));
-            var skipTour = _btn('Passer la visite', function () { _setTourState('done'); tour.destroy(); }, true);
-            var next     = _btn('Suivant ›', function () { tour.moveNext(); });
+            var prev = _btn('‹ Précédent', function () { tour.movePrevious(); }, true);
+            var next = _btn('Suivant ›', function () { tour.moveNext(); });
 
-            // Étape qui attend un geste ; « Passer cette étape » si le geste n'aboutit pas.
+            // Étape qui attend un geste ; « Suivant » la passe si le geste n'aboutit pas.
             // element : sélecteur ou fonction (résolue à l'affichage) ; side : côté de la bulle.
             function gestureStep(id, gesture, title, description, element, side) {
                 return {
                     element: element,
                     popover: { title: title, description: description, side: side || 'left', align: 'center', showButtons: ['close'] },
-                    data: { id: id, buttons: [skipTour, _btn('Passer cette étape', function () { tour.moveNext(); }, true)] },
+                    data: { id: id, closable: true, buttons: [prev, next] },
                     onHighlightStarted: function () {
                         _tourWaiting     = gesture;
                         _tourClicked     = false;
@@ -1150,7 +1160,10 @@ angular
                         _tourRotation    = 0;
                         _tourLastHeading = _heading;
                     },
-                    onDeselected: function () { _tourWaiting = null; _hideMapAnchor(); }
+                    // Le point d'ancrage n'appartient qu'à l'étape de la carte : Driver résout l'élément de l'étape
+                    // d'arrivée AVANT de désélectionner l'étape de départ, un retrait systématique le supprimerait
+                    // en revenant (Précédent) sur cette étape.
+                    onDeselected: function () { _tourWaiting = null; if (id === 'map-click') { _hideMapAnchor(); } }
                 };
             }
 
@@ -1159,9 +1172,8 @@ angular
                     popover: { title: 'Voici la vue immersive Panoramax',
                                description: 'Une minute pour la prendre en main ? On va le faire ensemble.',
                                showButtons: ['close'] },
-                    data: { id: 'intro', buttons: [
+                    data: { id: 'intro', closable: true, buttons: [
                         _btn('Ne plus afficher', function () { _setTourState('never'); tour.destroy(); }, true),
-                        skipTour,
                         _btn('C\'est parti', function () { tour.moveNext(); })
                     ] }
                 },
@@ -1182,7 +1194,7 @@ angular
                     advanceOnClick: true,
                     popover: { title: 'Plein écran', description: 'Agrandit le panneau pour mieux voir les photos.',
                                side: 'left', align: 'center', showButtons: ['close'] },
-                    data: { id: 'fullscreen', buttons: [skipTour, next] }
+                    data: { id: 'fullscreen', closable: true, buttons: [prev, next] }
                 },
                 {
                     // Bouton absent si aucune photo n'est affichée : la bulle est alors centrée
@@ -1196,13 +1208,13 @@ angular
                         step.popover.description = 'Ouvre la photo affichée dans une nouvelle fenêtre, sur le site Panoramax.' +
                             (element ? '' : ' (Ce bouton apparaît une fois qu\'une photo est affichée.)');
                     },
-                    data: { id: 'open-externally', buttons: [skipTour, next] }
+                    data: { id: 'open-externally', closable: true, buttons: [prev, next] }
                 },
                 {
                     element: '.geo-pnx-help-btn',
                     popover: { title: 'C\'est tout !', description: 'Vous pouvez relancer cette visite à tout moment avec ce bouton.',
                                side: 'left', align: 'center', showButtons: ['close'] },
-                    data: { id: 'help', buttons: [_btn('Terminer', function () { _setTourState('done'); tour.destroy(); })] }
+                    data: { id: 'help', closable: true, buttons: [prev, _btn('Terminer', function () { _setTourState('done'); tour.destroy(); })] }
                 }
             ];
 
@@ -1254,6 +1266,14 @@ angular
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;color:#444;padding:0;',
                 '  align-items:center;justify-content:center;}',
                 '.geo-pnx-point-btn:disabled{opacity:.5;cursor:default;}',
+                // Bouton « Nouveautés », sous le bouton de pointage ; point rouge tant que la version n'a pas été lue
+                '.geo-pnx-changelog-btn{position:absolute;right:12px;top:260px;z-index:5;',
+                '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
+                '  background:rgb(255,255,255);cursor:pointer;display:flex;color:#444;padding:0;',
+                '  align-items:center;justify-content:center;}',
+                '.geo-pnx-changelog-btn:hover{background:rgba(255,255,255,.95);}',
+                '.geo-pnx-dot-new{position:absolute;top:1px;right:1px;width:10px;height:10px;border-radius:50%;',
+                '  background:#d93025;border:2px solid #fff;}',
                 '.geo-pnx-point-btn.geo-pnx-fullscreen-btn--active{background:#1a73e8;color:#fff;',
                 '  border-color:#1a73e8;}',
                 '.geo-pnx-points{flex-shrink:0;border-top:1px solid #ddd;background:#f7f7f7;',
@@ -1279,7 +1299,6 @@ angular
                 // zoom/géoloc/permalien (topleft). On le masque tant que c'est le cas.
                 'body.' + _FULLSCREEN_BODY_CLASS + ' .acf-map-controls-topright{display:none!important;}',
 
-                '.geo-pnx-foot{flex-shrink:0;padding:4px 12px;border-top:1px solid #e3e6e0;text-align:right;background:#fff;}',
                 '.geo-pnx-status{padding:8px 12px;font-size:12px;color:#666;background:#f7f7f7;',
                 '  border-top:1px solid #ddd;flex-shrink:0;}',
                 // En bas (pas en haut : Panoramax y affiche ses propres contrôles/messages
@@ -1327,6 +1346,8 @@ angular
                 '  padding:0 14px;display:block;}',
                 '.geo-pnx-tour .driver-popover-description{font-size:14px;line-height:1.45;color:#263238;',
                 '  margin:0;padding:2px 14px 12px;}',
+                '.geo-pnx-tour .driver-popover-close-btn{width:30px;height:30px;font-size:20px;line-height:30px;color:#90a4ae;}',
+                '.geo-pnx-tour .driver-popover-close-btn:hover,.geo-pnx-tour .driver-popover-close-btn:focus-visible{color:#263238;}',
                 '.geo-pnx-tour-count{font-size:11px;font-weight:700;letter-spacing:.04em;',
                 '  text-transform:uppercase;color:#f04a4a;padding:12px 14px 4px;}',
                 '.geo-pnx-tour .driver-popover-footer{margin:0;padding:0 12px 12px;}',

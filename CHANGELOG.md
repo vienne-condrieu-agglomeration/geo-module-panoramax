@@ -11,6 +11,14 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+### Modifié
+
+- Le journal des nouveautés s'ouvre avec un bouton flottant (étincelles, sous le bouton de pointage) au lieu d'un
+  bandeau en bas du panneau : la photo à 360° reprend toute la hauteur
+- Visite guidée : une croix en haut à droite ferme la visite (elle ne revient plus d'elle-même), et deux boutons
+  « Précédent » et « Suivant » permettent d'avancer ou de revenir d'une étape ; « Passer la visite » et
+  « Passer cette étape » disparaissent
+
 ## [1.7.0] — 2026-10-23
 
 Le module garde la trace de ses évolutions.
