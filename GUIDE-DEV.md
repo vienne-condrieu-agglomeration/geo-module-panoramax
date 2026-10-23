@@ -39,6 +39,9 @@ version à l'autre :
    prête). La valeur par défaut du composant s'applique, et **la mini-carte interne de Panoramax
    est affichée**. L'explication causale est une hypothèse, la correction a été validée en test.
 4. **À l'ouverture** (`ready`), recherche la photo la plus proche du centre de la carte GEO.
+   Démarré sans photo, le viewer affiche sa carte en grand et y reste à la première sélection :
+   le module pose `focus="pic"` au premier `select` pour afficher la photo en grand (une seule
+   fois, le bouton carte/photo reste ensuite au choix de l'utilisateur).
 5. **Tant que le panneau est ouvert, un clic sur la carte GEO**
    (`geoApplication.map.on('pointerClick', …)`) recherche et affiche la photo la plus proche du
    point cliqué. Les coordonnées sont **transformées en EPSG:4326** via `geoApplication.transform`
