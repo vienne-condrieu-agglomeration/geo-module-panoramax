@@ -24,7 +24,7 @@ angular
         // Journal des nouveautés : lien en bas du panneau, point rouge tant que la version n'a pas été lue
         var changelog = createChangelog({
             name: pluginConf.name, title: pluginConf.displayName, version: pluginConf.version,
-            markdown: changelogMd, prefix: 'geo-pnx'
+            markdown: changelogMd, prefix: 'geo-pnx', zIndex: 1000000001
         });
 
         var _toolName           = 'Panoramax';
@@ -206,28 +206,30 @@ angular
                 // sous-composant carte interne du viewer soit prêt (Uncaught Error:
                 // Map is not enabled) — on laisse le défaut faire son travail.
                 '    <pnx-viewer class="geo-pnx-viewer"></pnx-viewer>',
-                '    <button class="geo-pnx-open-btn" ng-if="currentPicId" ng-click="openExternally()"',
-                '            title="Ouvrir dans Panoramax">',
-                '      ' + _LUCIDE.link,
-                '    </button>',
+                // Colonne de boutons flottants, de haut en bas : plein écran, ouvrir dans Panoramax, pointage,
+                // nouveautés, aide (visite guidée). L'infobulle (data-tip, CSS) apparaît dès le survol : le title
+                // natif tardait ou n'apparaissait pas dans GEO.
                 '    <button class="geo-pnx-fullscreen-btn" ng-class="{\'geo-pnx-fullscreen-btn--active\': isFullscreen}"',
-                '            ng-click="toggleFullscreen()"',
-                '            title="{{ isFullscreen ? \'Réduire\' : \'Agrandir en plein écran\' }}">',
+                '            ng-click="toggleFullscreen()" data-tip="{{ isFullscreen ? \'Quitter le plein écran\' : \'Plein écran\' }}"',
+                '            aria-label="{{ isFullscreen ? \'Quitter le plein écran\' : \'Plein écran\' }}">',
                 '      <span ng-if="!isFullscreen">' + _LUCIDE.maximize + '</span>',
                 '      <span ng-if="isFullscreen">' + _LUCIDE.minimize + '</span>',
                 '    </button>',
-                '    <button class="geo-pnx-help-btn" ng-click="startTour()" title="Aide — visite guidée">',
-                '      ' + _LUCIDE.help,
+                '    <button class="geo-pnx-open-btn" ng-if="currentPicId" ng-click="openExternally()"',
+                '            data-tip="Ouvrir dans Panoramax" aria-label="Ouvrir dans Panoramax">',
+                '      ' + _LUCIDE.link,
                 '    </button>',
                 '    <button class="geo-pnx-point-btn" ng-class="{\'geo-pnx-fullscreen-btn--active\': pointing}"',
                 '            ng-click="togglePointing()" ng-disabled="!currentPicId"',
-                '            title="Pointer un objet sur la photo">',
+                '            data-tip="Pointer un objet sur la photo" aria-label="Pointer un objet sur la photo">',
                 '      ' + _LUCIDE.crosshair,
                 '    </button>',
-                // Nouveautés du module : bouton flottant comme les autres (le viewer garde toute la hauteur)
-                '    <button class="geo-pnx-changelog-btn" ng-click="openChangelog()" title="{{ changelogTitle }}" aria-label="Nouveautés du module">',
+                '    <button class="geo-pnx-changelog-btn" ng-click="openChangelog()" data-tip="{{ changelogTitle }}" aria-label="Nouveautés du module">',
                 '      ' + _LUCIDE.sparkles,
                 '      <i class="geo-pnx-dot-new" ng-if="changelogNew()"></i>',
+                '    </button>',
+                '    <button class="geo-pnx-help-btn" ng-click="startTour()" data-tip="Visite guidée" aria-label="Visite guidée">',
+                '      ' + _LUCIDE.help,
                 '    </button>',
                 '    <div class="geo-pnx-hint" ng-if="pointing">',
                 '      Cliquez sur le <strong>pied</strong> de l\'objet, au sol, pour le placer sur la carte.',
@@ -1211,6 +1213,25 @@ angular
                     data: { id: 'open-externally', closable: true, buttons: [prev, next] }
                 },
                 {
+                    // Bouton grisé tant qu'aucune photo n'est affichée : pas d'avance au clic, « Suivant » seulement.
+                    element: '.geo-pnx-point-btn',
+                    popover: { title: 'Pointer un objet',
+                               description: 'Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.',
+                               side: 'left', align: 'center', showButtons: ['close'] },
+                    onHighlightStarted: function (element, step) {
+                        var base = 'Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.';
+                        step.popover.description = base + (element && element.disabled ? ' (Disponible une fois une photo affichée.)' : '');
+                    },
+                    data: { id: 'point', closable: true, buttons: [prev, next] }
+                },
+                {
+                    element: '.geo-pnx-changelog-btn',
+                    popover: { title: 'Nouveautés du module',
+                               description: 'Ce bouton ouvre le journal des évolutions du module ; le point rouge signale une version que vous n\'avez pas encore lue.',
+                               side: 'left', align: 'center', showButtons: ['close'] },
+                    data: { id: 'changelog', closable: true, buttons: [prev, next] }
+                },
+                {
                     element: '.geo-pnx-help-btn',
                     popover: { title: 'C\'est tout !', description: 'Vous pouvez relancer cette visite à tout moment avec ce bouton.',
                                side: 'left', align: 'center', showButtons: ['close'] },
@@ -1238,9 +1259,9 @@ angular
                 '.geo-pnx-viewer-wrap{position:relative;flex:1;min-height:0;}',
                 '.geo-pnx-viewer{position:absolute;inset:0;width:100%;height:100%;}',
 
-                // Bouton rond "ouvrir dans Panoramax", sous le bouton d'aide. Pas en bas à
+                // Bouton rond "ouvrir dans Panoramax", sous le bouton plein écran. Pas en bas à
                 // gauche : le viewer y place son propre bouton photo/carte, qui le recouvrait.
-                '.geo-pnx-open-btn{position:absolute;right:12px;top:160px;z-index:5;',
+                '.geo-pnx-open-btn{position:absolute;right:12px;top:110px;z-index:5;',
                 '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;',
                 '  align-items:center;justify-content:center;font-size:18px;}',
@@ -1261,13 +1282,21 @@ angular
                 '.geo-pnx-fullscreen-btn--active:hover{background:#1558b0;}',
 
                 // Bouton de pointage, sous le bouton « ouvrir dans Panoramax »
-                '.geo-pnx-point-btn{position:absolute;right:12px;top:210px;z-index:5;',
+                '.geo-pnx-point-btn{position:absolute;right:12px;top:160px;z-index:5;',
                 '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;color:#444;padding:0;',
                 '  align-items:center;justify-content:center;}',
                 '.geo-pnx-point-btn:disabled{opacity:.5;cursor:default;}',
+                // Infobulle instantanée à gauche des boutons flottants (data-tip) ; masquée sur la cible de la
+                // visite guidée, dont la bulle occupe la même place.
+                '.geo-pnx-viewer-wrap [data-tip]::after{content:attr(data-tip);position:absolute;right:calc(100% + 8px);',
+                '  top:50%;transform:translateY(-50%);white-space:nowrap;padding:5px 9px;border-radius:4px;',
+                '  background:#263238;color:#fff;font:12px/1.3 Arial,Helvetica,sans-serif;pointer-events:none;',
+                '  opacity:0;transition:opacity .12s;z-index:6;}',
+                '.geo-pnx-viewer-wrap [data-tip]:hover::after,.geo-pnx-viewer-wrap [data-tip]:focus-visible::after{opacity:1;}',
+                '.geo-pnx-viewer-wrap [data-tip].driver-active-element::after{display:none;}',
                 // Bouton « Nouveautés », sous le bouton de pointage ; point rouge tant que la version n'a pas été lue
-                '.geo-pnx-changelog-btn{position:absolute;right:12px;top:260px;z-index:5;',
+                '.geo-pnx-changelog-btn{position:absolute;right:12px;top:210px;z-index:5;',
                 '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;color:#444;padding:0;',
                 '  align-items:center;justify-content:center;}',
@@ -1286,8 +1315,8 @@ angular
                 '  padding:2px 0;}',
                 '.geo-pnx-points-del{border:none;background:none;cursor:pointer;font-size:16px;color:#666;}',
 
-                // Bouton d'aide, sous le bouton plein écran
-                '.geo-pnx-help-btn{position:absolute;right:12px;top:110px;z-index:5;',
+                // Bouton d'aide (visite guidée), en bas de la colonne, sous le bouton « Nouveautés »
+                '.geo-pnx-help-btn{position:absolute;right:12px;top:260px;z-index:5;',
                 '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;',
                 '  align-items:center;justify-content:center;font-size:16px;font-weight:700;',

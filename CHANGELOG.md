@@ -11,6 +11,17 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+### Ajouté
+
+- Infobulle immédiate au survol de chaque bouton flottant du viewer (plein écran, ouvrir dans Panoramax, pointage,
+  nouveautés, visite guidée), à la place de l'info-bulle du navigateur qui n'apparaissait pas
+- La visite guidée présente maintenant aussi le bouton de pointage et le bouton « Nouveautés » (9 étapes)
+
+### Modifié
+
+- Boutons flottants réordonnés : plein écran, ouvrir dans Panoramax, pointage, nouveautés, puis le « ? » de la
+  visite guidée tout en bas, dans l'ordre où la visite les présente
+
 ## [1.8.0] — 2026-10-23
 
 ### Modifié

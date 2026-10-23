@@ -68,7 +68,7 @@ version à l'autre :
      d'accroche). Elle se ferme au clic sur l'onglet et, par sécurité, au début du contrôleur
      du panneau.
    - **Visite du panneau** au premier `ready` du viewer (donc après la confirmation éventuelle),
-     7 étapes dont 3 interactives qui avancent sur le vrai geste via `_tourNotify`, appelé
+     9 étapes dont 3 interactives qui avancent sur le vrai geste via `_tourNotify`, appelé
      depuis les gestionnaires existants :
      clic sur la carte (`pointerClick` **puis** `select` d'une nouvelle photo : la photo du
      centre sélectionnée automatiquement à l'ouverture ne compte pas), rotation cumulée ≥ 30°
@@ -93,6 +93,12 @@ version à l'autre :
      `_TOUR_VERSION` à `v2` réaffiche la visite une fois pour tout le monde.
    - **Accroche ancrée sur l'icône elle-même** (la plus à droite parmi les `.icon_panoramax`
      visibles) : ancrée sur son ancêtre cliquable, elle se décalait vers le milieu de l'écran.
+   - **Infobulles** : les boutons flottants portent `data-tip` (CSS `::after`, à gauche du bouton, instantané) ;
+     le `title` natif n'apparaissait pas dans GEO. L'infobulle est masquée sur la cible de la visite
+     (`.driver-active-element`), dont la bulle occupe la même place.
+   - **Colonne de boutons**, de haut en bas : plein écran, ouvrir dans Panoramax, pointage, nouveautés, aide (`?`) ;
+     la visite les présente dans cet ordre (pointage et nouveautés sans avance au clic : « Suivant » seulement,
+     la modale des nouveautés a un `zIndex` supérieur à celui de Driver).
    - **Étapes « boutons »** (plein écran, ouvrir dans Panoramax) : cliquer sur le bouton
      désigné avance aussi (`advanceOnClick`) ; sur la dernière, cliquer sur « ? » termine la visite.
    - **Thème `.geo-pnx-tour`** (choisi le 14/10/2026 sur une planche de 3 variantes) :
