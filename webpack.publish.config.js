@@ -38,6 +38,21 @@ module.exports = {
         use: ["style-loader", "css-loader"]
       },
       {
+        // driver.js (visite guidée, MIT) est publié en syntaxe récente (?., ??) que le parseur de
+        // webpack 4 ne comprend pas : on ne transpile que ces deux constructions.
+        test: /\.c?js$/,
+        include: /node_modules[\\/]driver\.js/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            plugins: [
+              "@babel/plugin-transform-optional-chaining",
+              "@babel/plugin-transform-nullish-coalescing-operator"
+            ]
+          }
+        }
+      },
+      {
         test: /\.js$/,
         include: /node_modules[\\/]@panoramax/,
         use: {

@@ -40,6 +40,6 @@
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@panoramax/web-viewer": "^5.2.0",
-    "shepherd.js": "^15.3.0"
+    "driver.js": "^1.10.2"
   }
 }

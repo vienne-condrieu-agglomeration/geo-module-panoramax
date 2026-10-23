@@ -108,6 +108,15 @@
           "required": false,
           "type": "STRING",
           "defaultValue": "Panoramax"
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Afficher la visite guidée au premier lancement",
+          "description": "Affiche une bulle sur l'onglet Panoramax à l'ouverture de l'application, puis une visite guidée interactive à la première ouverture du panneau. L'utilisateur peut la passer ou choisir de ne plus la voir (mémorisé dans le navigateur). La visite reste accessible avec le bouton « ? » du panneau.",
+          "key": "showTourOnStart",
+          "required": false,
+          "type": "BOOLEAN",
+          "defaultValue": true
         }
       ]
     }

@@ -61,7 +61,41 @@ version à l'autre :
    est retenue, tous utilisateurs confondus.
 8. **Bouton rond « ouvrir dans Panoramax »** superposé au viewer, visible quand une photo est
    affichée : ouvre `{siteUrl}/?pic={picId}` dans un nouvel onglet (voir « Points à vérifier »).
-9. **Bouton d'aide** : visite guidée (Shepherd.js, AGPL-3.0).
+9. **Tuto d'accueil et bouton d'aide** (Driver.js, MIT ; design : `docs/designs/tuto-accueil.md`, écrit pour la
+   première version sous Shepherd.js, remplacé depuis par Driver.js, de licence MIT) :
+   - **Accroche** au chargement de l'appli : une bulle d'une étape sur l'onglet Panoramax
+     (élément trouvé via l'icône `.icon_panoramax`, 10 essais espacés de 500 ms, sinon pas
+     d'accroche). Elle se ferme au clic sur l'onglet et, par sécurité, au début du contrôleur
+     du panneau.
+   - **Visite du panneau** au premier `ready` du viewer (donc après la confirmation éventuelle),
+     7 étapes dont 3 interactives qui avancent sur le vrai geste via `_tourNotify`, appelé
+     depuis les gestionnaires existants :
+     clic sur la carte (`pointerClick` **puis** `select` d'une nouvelle photo : la photo du
+     centre sélectionnée automatiquement à l'ouverture ne compte pas), rotation cumulée ≥ 30°
+     (`view-rotated`), photo suivante (`select`). Chaque étape a « Passer cette étape ».
+   - **Visite non modale** : Driver.js voile la page et bloque tout clic hors de l'élément visé
+     (`body.driver-active * { pointer-events: none }`), ce qui empêcherait de cliquer sur la carte
+     GEO, justement le geste à apprendre. Le module règle `overlayOpacity: 0`, masque le SVG du
+     voile en CSS (`.driver-overlay`) et retire la classe `driver-active` de `<body>` juste après
+     `drive()` (`_driveTour`) ; la cible pulse (`.driver-active-element`). Si une mise à jour de
+     Driver.js change ces noms de classes, c'est le seul endroit à revoir.
+   - **Clavier** : les étapes ne déclarent que `showButtons: ['close']`, donc Driver ignore ← →
+     (qui feraient sauter les étapes interactives, la bulle prenant le focus). Les boutons natifs
+     de Driver sont masqués, les nôtres (`step.data.buttons`) disent ce qui est mémorisé ; pas de
+     croix, Échap ferme sans rien mémoriser.
+   - **Mémorisation** : clé `localStorage` `geo-panoramax-tour` = `v1:done` (Terminer ou Passer
+     la visite) ou `v1:never` (Ne plus afficher). Seuls ces boutons écrivent. Fermer le panneau
+     en pleine visite n'écrit rien : elle reprend au début à la prochaine ouverture. Passer
+     `_TOUR_VERSION` à `v2` réaffiche la visite une fois pour tout le monde.
+   - **Accroche ancrée sur l'icône elle-même** (la plus à droite parmi les `.icon_panoramax`
+     visibles) : ancrée sur son ancêtre cliquable, elle se décalait vers le milieu de l'écran.
+   - **Étapes « boutons »** (plein écran, ouvrir dans Panoramax) : cliquer sur le bouton
+     désigné avance aussi (`advanceOnClick`) ; sur la dernière, cliquer sur « ? » termine la visite.
+   - **Thème `.geo-pnx-tour`** (choisi le 14/10/2026 sur une planche de 3 variantes) :
+     blanc, liseré et bouton principal rouge GEO `#f04a4a`, coins 4px, boutons secondaires en
+     texte simple, compteur « Étape N sur M ». Tailles en px pour ne pas dépendre de GEO.
+   - **Réglage** `showTourOnStart` (défaut : oui) pour couper l'accroche et la visite
+     automatiques dans une appli. Le bouton « ? » lance toujours la visite.
 10. **Cône de vision** sur le marqueur de la carte GEO, orienté selon la direction regardée dans
     le viewer. Le cap vient des événements du sous-composant photo `viewerEl.psv` (ils ne
     remontent pas jusqu'à `<pnx-viewer>`) :
@@ -136,6 +170,38 @@ version à l'autre :
 
   Pour inspecter l'API carte en console : `angular.element(document.body).injector().get('geoApplication').map`
   (les signatures minifiées s'obtiennent avec `.toString()` sur chaque méthode).
+
+## Tester la visite (à dérouler sur GEO avant chaque ZIP)
+
+Pas de tests automatisés : le code dépend de GEO et du viewer. En console, vider la clé avec
+`localStorage.removeItem('geo-panoramax-tour')` puis recharger l'appli.
+
+**Tuto**
+- [ ] Bulle d'accroche sur l'onglet ; « Plus tard » la ferme, elle revient au rechargement.
+- [ ] Ouvrir l'onglet alors que la bulle est affichée : la bulle disparaît.
+- [ ] Avec la confirmation : la visite ne démarre qu'après « Oui » ; « Non » → pas de visite.
+- [ ] Étape « Cliquez sur la carte » : la photo du centre s'affiche sans faire avancer l'étape ;
+      un clic sur une rue → « ✓ Bien joué » → étape suivante. Un clic loin des photos → message
+      « Aucune photo… », l'étape attend.
+- [ ] « Regardez autour » : glisser d'au moins 30° fait avancer l'étape ; le cône tourne.
+- [ ] « Avancez » : une flèche du viewer fait avancer l'étape ; le marqueur suit.
+- [ ] Les flèches ← → du clavier ne font pas avancer la visite.
+- [ ] Étapes plein écran / ouvrir dans Panoramax : cliquer sur le bouton désigné avance ;
+      dernière étape : cliquer sur « ? » termine la visite (rien ne réapparaît ensuite).
+- [ ] La bulle d'accroche pointe bien l'onglet Panoramax de la barre de droite.
+- [ ] Terminer, ou Passer la visite → recharger : ni accroche ni visite ; « ? » relance la visite.
+- [ ] Ne plus afficher (accroche ou visite) → recharger : rien ne réapparaît.
+- [ ] Fermer le panneau en pleine visite → rouvrir : la visite reprend au début.
+- [ ] `showTourOnStart` décoché dans le Générateur : ni accroche ni visite auto ; « ? » marche.
+- [ ] Console sans erreur, y compris en navigation privée (localStorage bloqué).
+
+**Non-régression (ne doit pas changer)**
+- [ ] Confirmation Oui / Non / Ne plus demander.
+- [ ] Marqueur et recentrage `centerOn` sans dézoom à chaque photo.
+- [ ] Cône orienté au chargement et pendant la rotation.
+- [ ] Fermeture du panneau : marqueur retiré, plus de recherche au clic sur la carte.
+- [ ] Groupe de couches coché à l'ouverture, décoché à la fermeture.
+- [ ] Plein écran et « Ouvrir dans Panoramax ».
 
 ## Piège webpack 4 : ne PAS utiliser `@babel/preset-env` sans réglage fin
 
