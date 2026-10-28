@@ -120,6 +120,15 @@
         },
         {
           "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Afficher les séquences et les photos sur la carte",
+          "description": "Tant que le panneau Panoramax est ouvert, affiche sur la carte GEO le tracé des séquences Panoramax (lignes violettes) et, en zoomant, l'emplacement des photos (points). Couche ajoutée par le module à partir des tuiles vectorielles de l'instance : rien à configurer dans les couches de l'application. Inutile si l'application affiche déjà ces données par une couche du groupe ci-dessus.",
+          "key": "showCoverageLayer",
+          "required": false,
+          "type": "BOOLEAN",
+          "defaultValue": false
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
           "name": "Hauteur de la caméra (m)",
           "description": "Hauteur de la caméra au-dessus du sol, utilisée pour pointer un objet depuis la photo (projection sur le sol). Environ 2,5 m pour un véhicule, 1,5 m pour une prise à pied. Une erreur de 30 cm sur cette valeur donne environ 1,2 m d'erreur à 10 m de distance.",
           "key": "cameraHeight",

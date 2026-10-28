@@ -148,6 +148,26 @@ version à l'autre :
       visée : voir l'issue. Photos plates : `sphereCorrection` (inclinaison de la caméra)
       ignorée, à vérifier.
 
+13. **Séquences et photos sur la carte GEO** (config `showCoverageLayer`, défaut : non). Tant que le
+    panneau est ouvert, le module ajoute à la carte GEO une couche OpenLayers alimentée par les
+    tuiles vectorielles (MVT) de l'instance, retirée à la fermeture (`$destroy`) :
+    - URL des tuiles lue dans le lien `rel="xyz"` de la page d'accueil de l'API (`GET {instance}`),
+      sinon `{instance}/map/{z}/{x}/{y}.mvt` ; tuiles servies jusqu'au zoom 15 ;
+    - couches internes dessinées : `sequences` (lignes violettes `#54278f`, comme le viewer) et
+      `pictures` (points, en dessous de 2,4 m/px) ; `grid` (petits zooms) ignorée ;
+    - **GEO n'expose pas sa carte OpenLayers** : elle est cherchée par duck typing (`getLayers`,
+      `getView`, `addLayer`, `getViewport`) dans `geoApplication`, puis dans les scopes Angular, en
+      gardant la plus grande carte affichée (pas une carte de situation) ; classes prises dans
+      `window.ol`, celui de GEO (une autre copie d'OpenLayers ne marcherait pas avec sa carte).
+      Si l'un manque : message en console, rien d'autre ;
+    - carte en EPSG:3857 : `ol.layer.VectorTile` natif. Autre projection (ex. Lambert 93) :
+      OpenLayers ne reprojette pas les tuiles vectorielles, le module charge donc les tuiles Web
+      Mercator de l'emprise et reprojette leurs objets dans un `ol.layer.Vector`, vidé et rechargé
+      quand le niveau de tuiles change ;
+    - testé hors GEO (Chromium, OpenLayers 6.15, cartes 3857 et 2154, tuiles simulées) et essayé
+      sur GEO 4.3.2 ; dépend de la structure interne de GEO, à revérifier à chaque montée de version.
+      Inutile si l'appli affiche déjà ces données par une couche du groupe `layerGroupName`.
+
 ## Points à vérifier avant mise en production
 
 - **Lien « ouvrir dans Panoramax »** : l'URL de l'instance se termine par `/api` (voir ci-dessous),
@@ -229,6 +249,7 @@ Pas de tests automatisés : le code dépend de GEO et du viewer. En console, vid
 - [ ] Cône orienté au chargement et pendant la rotation.
 - [ ] Fermeture du panneau : marqueur retiré, plus de recherche au clic sur la carte.
 - [ ] Groupe de couches coché à l'ouverture, décoché à la fermeture.
+- [ ] Séquences (et photos en zoomant) affichées sur la carte GEO à l'ouverture, retirées à la fermeture ; pas d'erreur « carte OpenLayers de GEO introuvable » en console.
 - [ ] Plein écran et « Ouvrir dans Panoramax ».
 
 ## Piège webpack 4 : ne PAS utiliser `@babel/preset-env` sans réglage fin

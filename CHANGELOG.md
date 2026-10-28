@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+### Ajouté
+
+- Réglage du Générateur « Afficher les séquences et les photos sur la carte » (désactivé par défaut) : tant que le
+  panneau est ouvert, la carte GEO montre le tracé des séquences Panoramax (lignes violettes) et, en zoomant,
+  l'emplacement des photos, sans couche à configurer dans l'application
+
 ## [1.8.2] — 2026-10-23
 
 ### Modifié

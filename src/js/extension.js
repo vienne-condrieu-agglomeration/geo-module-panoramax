@@ -31,7 +31,8 @@ angular
         var _confirmBeforeOpen  = true;
         var _layerGroupName     = 'Panoramax'; // groupe de couches GEO affiché tant que le panneau est ouvert
         var _showTourOnStart    = true;        // accroche + visite guidée automatiques au premier lancement
-        var _registered         = false;
+        var _showCoverageLayer  = false;       // séquences et photos dessinées sur la carte GEO tant que le panneau est ouvert
+        var _registered        = false;
         var _widgetId           = null;
         var _panelWidthPct      = 50;
         var _cameraHeight       = 2.5;  // m, hauteur de la caméra au-dessus du sol (pointage)
@@ -83,6 +84,7 @@ angular
                 _layerGroupName   = (props.layerGroupName == null ? _layerGroupName : String(props.layerGroupName)).trim() || null;
                 _showTourOnStart  = props.showTourOnStart !== false && props.showTourOnStart !== 'false';
                 _cameraHeight     = parseFloat(props.cameraHeight) || _cameraHeight;
+                _showCoverageLayer = props.showCoverageLayer === true || props.showCoverageLayer === 'true';
             }
 
             if (!_registered) {
@@ -270,6 +272,7 @@ angular
                 // que soit l'élément GEO cliqué pour l'ouvrir (rien n'est mémorisé).
                 _cancelTeaser();
                 _setLayerGroupVisible(true);
+                _setCoverageVisible(true);
                 _panelWidthPct = 50; // état par défaut à chaque (re)ouverture du panneau
 
                 $scope.currentPicId    = null;
@@ -513,6 +516,7 @@ angular
                     _currentScope = null;
                     _removeMarker();
                     _setLayerGroupVisible(false);
+                    _setCoverageVisible(false);
                     _removePointMarkers(_points);
                 });
             }];
@@ -643,6 +647,247 @@ angular
                 if (!done && --tries > 0) { _layerTimer = setTimeout(attempt, 300); }
             }
             _layerTimer = setTimeout(attempt, 0);
+        }
+
+        // ============================================================
+        // Séquences et photos Panoramax sur la carte GEO (réglage showCoverageLayer)
+        // ============================================================
+        // Couche OpenLayers ajoutée par le module tant que le panneau est ouvert, à partir des
+        // tuiles vectorielles (MVT) de l'instance : couches internes « sequences » (lignes) et
+        // « pictures » (points, présentes dans les tuiles de zoom 15).
+        // ponytail: GEO n'expose pas sa carte OpenLayers : on la cherche par duck typing dans
+        // geoApplication puis dans les scopes Angular, et on utilise window.ol (celui de GEO,
+        // seul compatible avec sa carte). Sans effet (message en console) si l'un des deux
+        // manque. Remplacer par l'API GEO si elle permet un jour d'ajouter une couche MVT.
+        var _COVERAGE_COLOR   = '#54278f';  // violet des séquences dans le viewer Panoramax
+        var _COVERAGE_ZINDEX  = 1000;
+        var _COVERAGE_MAX_Z   = 15;         // zoom maximal servi par les tuiles Panoramax
+        var _PICTURES_MAX_RES = 2.4;        // m/px (~zoom 16) : en deçà, points des photos illisibles
+        var _covWanted   = false;
+        var _covLayer    = null;
+        var _covMap      = null;
+        var _covMoveKey  = null;
+        var _covUrl      = null;            // Promise de l'URL des tuiles
+        var _covTimer    = null;
+
+        function _setCoverageVisible(visible) {
+            if (!_showCoverageLayer) { return; }
+            _covWanted = visible;
+            clearTimeout(_covTimer);
+            if (!visible) {
+                if (_covMap && _covLayer) {
+                    _covMap.removeLayer(_covLayer);
+                    if (_covMoveKey) { window.ol.Observable.unByKey(_covMoveKey); _covMoveKey = null; }
+                }
+                return;
+            }
+            var ol = window.ol;
+            if (!ol || !ol.layer || !ol.source || !ol.format || !ol.format.MVT) {
+                console.error('[geo-panoramax] window.ol (OpenLayers de GEO) absent ou incomplet : ' +
+                              'séquences non affichées sur la carte.');
+                return;
+            }
+            _coverageTilesUrl().then(function (url) {
+                // La carte OpenLayers peut ne pas être prête dès l'ouverture : quelques essais.
+                var tries = 10; // 10 × 500 ms
+                (function attempt() {
+                    if (!_covWanted) { return; }
+                    var map = _findOlMap();
+                    if (!map) {
+                        if (--tries > 0) { _covTimer = setTimeout(attempt, 500); }
+                        else { console.error('[geo-panoramax] carte OpenLayers de GEO introuvable : séquences non affichées.'); }
+                        return;
+                    }
+                    _addCoverageLayer(map, url);
+                })();
+            });
+        }
+
+        // URL des tuiles annoncée par l'instance (lien rel="xyz" de la page d'accueil de l'API),
+        // sinon la route habituelle de Géovisio.
+        function _coverageTilesUrl() {
+            if (!_covUrl) {
+                var fallback = _instanceUrl + '/map/{z}/{x}/{y}.mvt';
+                _covUrl = fetch(_instanceUrl)
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (landing) {
+                        var links = (landing && landing.links) || [];
+                        for (var i = 0; i < links.length; i++) {
+                            if (links[i].rel === 'xyz' && links[i].href) {
+                                return links[i].href.replace(/%7B/gi, '{').replace(/%7D/gi, '}');
+                            }
+                        }
+                        return fallback;
+                    })
+                    .catch(function () { return fallback; });
+            }
+            return _covUrl;
+        }
+
+        function _isOlMap(o) {
+            return typeof o.getLayers === 'function' && typeof o.getView === 'function' &&
+                   typeof o.addLayer === 'function' && typeof o.getViewport === 'function';
+        }
+
+        // Parcours en largeur (borné) de geoApplication puis des scopes Angular ; parmi les
+        // cartes trouvées, garde celle dont la zone affichée est la plus grande (pas la
+        // carte de situation, s'il y en a une).
+        function _findOlMap() {
+            if (_covMap && document.contains(_covMap.getViewport())) { return _covMap; }
+            var seen  = new Set();
+            var queue = [];
+            function push(o, depth) {
+                if (!o || typeof o !== 'object' || seen.has(o) || o === window ||
+                    (typeof Node !== 'undefined' && o instanceof Node)) { return; }
+                seen.add(o);
+                queue.push([o, depth]);
+            }
+            push(geoApplication.map, 0);
+            push(geoApplication, 0);
+            var scopes = [$rootScope];
+            while (scopes.length) {
+                var s = scopes.pop();
+                push(s, 1);
+                for (var c = s.$$childHead; c; c = c.$$nextSibling) { scopes.push(c); }
+            }
+
+            var best = null, bestArea = 0;
+            for (var i = 0; i < queue.length && i < 30000; i++) {
+                var o = queue[i][0], depth = queue[i][1];
+                try {
+                    if (_isOlMap(o)) {
+                        var vp = o.getViewport();
+                        var area = vp && document.contains(vp) ? vp.offsetWidth * vp.offsetHeight : 0;
+                        if (area > bestArea) { best = o; bestArea = area; }
+                        continue;
+                    }
+                    if (depth >= 4) { continue; }
+                    var keys = Array.isArray(o) ? Object.keys(o).slice(0, 100) : Object.keys(o);
+                    for (var k = 0; k < keys.length; k++) {
+                        if (keys[k].indexOf('$$') === 0) { continue; } // internes Angular (scopes parcourus à part)
+                        push(o[keys[k]], depth + 1);
+                    }
+                } catch (e) { /* getter qui lève : on passe */ }
+            }
+            return best;
+        }
+
+        function _addCoverageLayer(map, url) {
+            if (_covMap !== map) { _covLayer = null; }
+            _covMap = map;
+            if (!_covLayer) {
+                var projection = map.getView().getProjection().getCode();
+                _covLayer = projection === 'EPSG:3857'
+                    ? _buildVectorTileLayer(url)
+                    : _buildReprojectedLayer(url, map);
+                _covLayer.setZIndex(_COVERAGE_ZINDEX);
+            }
+            if (map.getLayers().getArray().indexOf(_covLayer) === -1) { map.addLayer(_covLayer); }
+            var onMoveEnd = _covLayer.get('pnxOnMoveEnd');
+            if (onMoveEnd && !_covMoveKey) {
+                _covMoveKey = map.on('moveend', onMoveEnd);
+                onMoveEnd(); // réouverture du panneau à un autre zoom : tuiles à recharger
+            }
+        }
+
+        function _coverageStyle() {
+            var ol = window.ol;
+            var seq = new ol.style.Style({
+                stroke: new ol.style.Stroke({ color: _COVERAGE_COLOR, width: 3 })
+            });
+            var pic = new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 4,
+                    fill:   new ol.style.Fill({ color: _COVERAGE_COLOR }),
+                    stroke: new ol.style.Stroke({ color: '#fff', width: 1 })
+                })
+            });
+            // « layer » : nom de la couche interne de la tuile, posé par ol.format.MVT.
+            return function (feature, resolution) {
+                var layer = feature.get('layer');
+                if (layer === 'sequences') { return seq; }
+                if (layer === 'pictures' && resolution <= _PICTURES_MAX_RES) { return pic; }
+                return null; // « grid » (statistiques des petits zooms) : non dessinée
+            };
+        }
+
+        // Carte en Web Mercator : couche de tuiles vectorielles native.
+        function _buildVectorTileLayer(url) {
+            var ol = window.ol;
+            return new ol.layer.VectorTile({
+                source: new ol.source.VectorTile({
+                    format:       new ol.format.MVT(),
+                    url:          url,
+                    maxZoom:      _COVERAGE_MAX_Z,
+                    attributions: '© contributeurs Panoramax'
+                }),
+                style: _coverageStyle()
+            });
+        }
+
+        // Autre projection (ex. Lambert 93) : OpenLayers ne reprojette pas les tuiles vectorielles.
+        // On charge donc nous-mêmes les tuiles Web Mercator de l'emprise affichée et on reprojette
+        // leurs objets dans une couche vectorielle simple. Au changement de niveau de tuiles, la
+        // couche est vidée et rechargée (sinon on garderait les tuiles du zoom précédent, sans photos).
+        function _buildReprojectedLayer(url, map) {
+            var ol      = window.ol;
+            var grid    = ol.tilegrid.createXYZ({ tileSize: 512, maxZoom: _COVERAGE_MAX_Z });
+            var format  = new ol.format.MVT({ featureClass: ol.Feature });
+            var loaded  = {};
+            var gen     = 0;
+            var tileZ   = null;
+
+            function zFor(extent, resolution, projection) {
+                var ext = ol.proj.transformExtent(extent, projection, 'EPSG:3857');
+                var res = (ext[2] - ext[0]) / ((extent[2] - extent[0]) / resolution);
+                return { z: grid.getZForResolution(res, 0), ext: ext };
+            }
+
+            var source = new ol.source.Vector({
+                strategy:     ol.loadingstrategy.bbox,
+                attributions: '© contributeurs Panoramax',
+                loader: function (extent, resolution, projection) {
+                    var t = zFor(extent, resolution, projection);
+                    var myGen = gen;
+                    tileZ = t.z;
+                    grid.forEachTileCoord(t.ext, t.z, function (tc) {
+                        var y = tc[2] < 0 ? -tc[2] - 1 : tc[2]; // OpenLayers < 6 : y négatif
+                        var key = tc[0] + '/' + tc[1] + '/' + y;
+                        if (loaded[key]) { return; }
+                        loaded[key] = true;
+                        fetch(url.replace('{z}', tc[0]).replace('{x}', tc[1]).replace('{y}', y))
+                            .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+                            .then(function (buf) {
+                                if (!buf || myGen !== gen) { return; }
+                                var features = format.readFeatures(buf, {
+                                    extent: grid.getTileCoordExtent(tc), featureProjection: 'EPSG:3857'
+                                });
+                                features.forEach(function (f) {
+                                    var g = f.getGeometry();
+                                    if (g) { g.transform('EPSG:3857', projection); }
+                                });
+                                source.addFeatures(features);
+                            })
+                            .catch(function (err) {
+                                delete loaded[key];
+                                console.error('[geo-panoramax] tuile Panoramax ' + key + ' non chargée :', err);
+                            });
+                    });
+                }
+            });
+
+            var layer = new ol.layer.Vector({ source: source, style: _coverageStyle() });
+            layer.set('pnxOnMoveEnd', function () {
+                var view = map.getView();
+                var t = zFor(view.calculateExtent(map.getSize()), view.getResolution(), view.getProjection());
+                if (tileZ !== null && t.z !== tileZ) {
+                    gen++;
+                    loaded = {};
+                    tileZ = null;
+                    source.clear(); // vide aussi les emprises déjà chargées : le loader repasse
+                }
+            });
+            return layer;
         }
 
         function _setStatus(message) {
