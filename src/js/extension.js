@@ -1042,7 +1042,7 @@ angular
 
         function _addPointMarker(pt) {
             if (!geoApplication.map) { return; }
-            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">' +
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" id="geo-pnx-marker" width="28" height="28" viewBox="0 0 28 28">' +
                 '<circle cx="14" cy="14" r="9" fill="#d93025" fill-opacity="0.85" stroke="#fff" stroke-width="3"/>' +
                 '<circle cx="14" cy="14" r="2.5" fill="#fff"/></svg>';
             geoApplication.map.addMarkers([{
@@ -1131,7 +1131,7 @@ angular
                 '<path d="M30 30 L15 4.02 A30 30 0 0 1 45 4.02 Z" fill="#1a73e8" fill-opacity="0.35" ' +
                 'stroke="#1a73e8" stroke-width="1.5" transform="rotate(' + heading.toFixed(1) + ' 30 30)"/>';
             return 'data:image/svg+xml;utf8,' + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" id="geo-pnx-marker" width="60" height="60" viewBox="0 0 60 60">' +
                 cone +
                 '<circle cx="30" cy="30" r="11" fill="#1a73e8" stroke="#fff" stroke-width="3"/>' +
                 '<circle cx="30" cy="30" r="4" fill="#fff"/></svg>'
@@ -1471,6 +1471,13 @@ angular
             style.id  = 'geo-panoramax-styles';
             style.textContent = [
                 '.geo-pnx-widget{display:flex;flex-direction:column;height:100%;background:#fff;}',
+
+                // Marqueurs du module (cône, points pointés) : GEO les pose en overlay HTML qui
+                // capte la molette, la carte ne zoomait plus sous le pointeur. On les rend
+                // transparents à la souris (repérés par l'id glissé dans leur SVG) ; contrepartie :
+                // plus d'infobulle au survol, et un clic dessus part à la carte.
+                '.ol-overlay-container:has([src*="geo-pnx-marker"]),.ol-overlay-container:has([src*="geo-pnx-marker"]) *,' +
+                '[src*="geo-pnx-marker"]{pointer-events:none!important;}',
                 '.geo-pnx-viewer-wrap{position:relative;flex:1;min-height:0;}',
                 '.geo-pnx-viewer{position:absolute;inset:0;width:100%;height:100%;}',
 
