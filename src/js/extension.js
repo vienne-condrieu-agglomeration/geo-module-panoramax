@@ -1478,7 +1478,11 @@ angular
                 // plus d'infobulle au survol, et un clic dessus part à la carte.
                 '.ol-overlay-container:has([src*="geo-pnx-marker"]),.ol-overlay-container:has([src*="geo-pnx-marker"]) *,' +
                 '[src*="geo-pnx-marker"]{pointer-events:none!important;}',
-                '.geo-pnx-viewer-wrap{position:relative;flex:1;min-height:0;}',
+                // Sous 576 px de large, le viewer passe en mise en page mobile : le détail de la photo
+                // devient un tiroir <pnx-bottom-drawer> en position:fixed, calé sur la fenêtre et non sur
+                // le panneau, qui recouvrait le bas de toute l'application. Le transform fait du conteneur
+                // le repère des éléments fixed du viewer ; overflow:hidden coupe ce qui dépasse.
+                '.geo-pnx-viewer-wrap{position:relative;flex:1;min-height:0;overflow:hidden;transform:translateZ(0);}',
                 '.geo-pnx-viewer{position:absolute;inset:0;width:100%;height:100%;}',
 
                 // Bouton rond "ouvrir dans Panoramax", sous le bouton plein écran. Pas en bas à
