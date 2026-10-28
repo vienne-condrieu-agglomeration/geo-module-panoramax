@@ -1,5 +1,7 @@
 # geo-panoramax — Comprendre un module GEO (version simple)
 
+![Aperçu : photos Panoramax le long de la plage de Saint-Trojan-les-Bains, séquences affichées sur la carte GEO puis clic sur la digue pour ouvrir la photo la plus proche](docs/apercu.gif)
+
 Ce module affiche un visualiseur de photos de rue [Panoramax](https://docs.panoramax.fr/) dans une application GEO. Quand on clique sur la carte, il affiche la photo la plus proche. Ce README explique aussi **comment fonctionne n'importe quel module GEO** et comment il s'articule avec le **Générateur GEO**.
 
 > Pour le détail technique de ce module : [`GUIDE-DEV.md`](GUIDE-DEV.md).
