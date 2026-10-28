@@ -21,6 +21,8 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 - La molette zoome à nouveau la carte GEO quand le pointeur est sur le marqueur de la photo (cône) ou sur un point
   pointé : ces marqueurs ne captent plus la souris (en contrepartie, plus d'infobulle à leur survol)
+- Sur un écran étroit, le détail de la photo (adresse, Partager, Signaler, onglets Résumé, Appareil…)
+  s'affichait en bas de toute l'application, par-dessus la carte : il reste désormais dans le panneau Panoramax
 
 ## [1.8.2] — 2026-10-23
 
