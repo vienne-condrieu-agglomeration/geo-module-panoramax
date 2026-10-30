@@ -10,8 +10,8 @@ import '@panoramax/web-viewer';
 
 angular
     .module(pluginConf.code.moduleName, pluginConf.code.dependencies)
-    .run(['geoApplication', 'acfExtensionService', '$rootScope', '$timeout',
-          function (geoApplication, acfExtensionService, $rootScope, $timeout) {
+    .run(['geoApplication', 'acfExtensionService', '$rootScope', '$timeout', '$injector',
+          function (geoApplication, acfExtensionService, $rootScope, $timeout, $injector) {
 
         // ============================================================
         // Configuration (remplie depuis le générateur GEO)
@@ -32,7 +32,7 @@ angular
         var _layerGroupName     = 'Panoramax'; // groupe de couches GEO affiché tant que le panneau est ouvert
         var _showTourOnStart    = true;        // accroche + visite guidée automatiques au premier lancement
         var _showCoverageLayer  = false;       // séquences et photos dessinées sur la carte GEO tant que le panneau est ouvert
-        var _registered        = false;
+        var _registered         = false;
         var _widgetId           = null;
         var _panelWidthPct      = 50;
         var _cameraHeight       = 2.5;  // m, hauteur de la caméra au-dessus du sol (pointage)
@@ -655,10 +655,10 @@ angular
         // Couche OpenLayers ajoutée par le module tant que le panneau est ouvert, à partir des
         // tuiles vectorielles (MVT) de l'instance : couches internes « sequences » (lignes) et
         // « pictures » (points, présentes dans les tuiles de zoom 15).
-        // ponytail: GEO n'expose pas sa carte OpenLayers : on la cherche par duck typing dans
-        // geoApplication puis dans les scopes Angular, et on utilise window.ol (celui de GEO,
-        // seul compatible avec sa carte). Sans effet (message en console) si l'un des deux
-        // manque. Remplacer par l'API GEO si elle permet un jour d'ajouter une couche MVT.
+        // ponytail: l'API GEO ne permet pas d'ajouter une couche : on passe par la carte
+        // OpenLayers que donne acfMapService (service interne, non documenté) et par window.ol
+        // (celui de GEO, seul compatible avec sa carte). Sans effet (message en console) si l'un
+        // des deux manque. Remplacer par l'API GEO si elle permet un jour d'ajouter une couche MVT.
         var _COVERAGE_COLOR   = '#54278f';  // violet des séquences dans le viewer Panoramax
         var _COVERAGE_ZINDEX  = 1000;
         var _COVERAGE_MAX_Z   = 15;         // zoom maximal servi par les tuiles Panoramax
@@ -704,7 +704,8 @@ angular
         }
 
         // URL des tuiles annoncée par l'instance (lien rel="xyz" de la page d'accueil de l'API),
-        // sinon la route habituelle de Géovisio.
+        // sinon la route habituelle de Géovisio. Le lien n'est retenu que s'il pointe vers
+        // l'instance configurée : la réponse ne doit pas pouvoir envoyer le navigateur ailleurs.
         function _coverageTilesUrl() {
             if (!_covUrl) {
                 var fallback = _instanceUrl + '/map/{z}/{x}/{y}.mvt';
@@ -713,8 +714,9 @@ angular
                     .then(function (landing) {
                         var links = (landing && landing.links) || [];
                         for (var i = 0; i < links.length; i++) {
-                            if (links[i].rel === 'xyz' && links[i].href) {
-                                return links[i].href.replace(/%7B/gi, '{').replace(/%7D/gi, '}');
+                            if (links[i].rel === 'xyz' && typeof links[i].href === 'string') {
+                                var href = links[i].href.replace(/%7B/gi, '{').replace(/%7D/gi, '}');
+                                if (_sameOrigin(href, _instanceUrl)) { return href; }
                             }
                         }
                         return fallback;
@@ -724,52 +726,20 @@ angular
             return _covUrl;
         }
 
-        function _isOlMap(o) {
-            return typeof o.getLayers === 'function' && typeof o.getView === 'function' &&
-                   typeof o.addLayer === 'function' && typeof o.getViewport === 'function';
+        // URL absolue de même origine que base (une URL relative est refusée : repli).
+        function _sameOrigin(url, base) {
+            try { return new URL(url).origin === new URL(base).origin; } catch (e) { return false; }
         }
 
-        // Parcours en largeur (borné) de geoApplication puis des scopes Angular ; parmi les
-        // cartes trouvées, garde celle dont la zone affichée est la plus grande (pas la
-        // carte de situation, s'il y en a une).
+        // Carte OpenLayers principale de GEO, par le service acfMapService (même accès que les
+        // modules cartographiques du dépôt) ; null tant que la carte n'est pas prête.
         function _findOlMap() {
-            if (_covMap && document.contains(_covMap.getViewport())) { return _covMap; }
-            var seen  = new Set();
-            var queue = [];
-            function push(o, depth) {
-                if (!o || typeof o !== 'object' || seen.has(o) || o === window ||
-                    (typeof Node !== 'undefined' && o instanceof Node)) { return; }
-                seen.add(o);
-                queue.push([o, depth]);
+            try {
+                var mapView = $injector.get('acfMapService').getMapViewImmediate();
+                return (mapView && mapView.getNativeMap()) || null;
+            } catch (e) {
+                return null;
             }
-            push(geoApplication.map, 0);
-            push(geoApplication, 0);
-            var scopes = [$rootScope];
-            while (scopes.length) {
-                var s = scopes.pop();
-                push(s, 1);
-                for (var c = s.$$childHead; c; c = c.$$nextSibling) { scopes.push(c); }
-            }
-
-            var best = null, bestArea = 0;
-            for (var i = 0; i < queue.length && i < 30000; i++) {
-                var o = queue[i][0], depth = queue[i][1];
-                try {
-                    if (_isOlMap(o)) {
-                        var vp = o.getViewport();
-                        var area = vp && document.contains(vp) ? vp.offsetWidth * vp.offsetHeight : 0;
-                        if (area > bestArea) { best = o; bestArea = area; }
-                        continue;
-                    }
-                    if (depth >= 4) { continue; }
-                    var keys = Array.isArray(o) ? Object.keys(o).slice(0, 100) : Object.keys(o);
-                    for (var k = 0; k < keys.length; k++) {
-                        if (keys[k].indexOf('$$') === 0) { continue; } // internes Angular (scopes parcourus à part)
-                        push(o[keys[k]], depth + 1);
-                    }
-                } catch (e) { /* getter qui lève : on passe */ }
-            }
-            return best;
         }
 
         function _addCoverageLayer(map, url) {
