@@ -152,14 +152,14 @@ version à l'autre :
     panneau est ouvert, le module ajoute à la carte GEO une couche OpenLayers alimentée par les
     tuiles vectorielles (MVT) de l'instance, retirée à la fermeture (`$destroy`) :
     - URL des tuiles lue dans le lien `rel="xyz"` de la page d'accueil de l'API (`GET {instance}`),
+      retenue seulement si elle est sur le même domaine que l'instance,
       sinon `{instance}/map/{z}/{x}/{y}.mvt` ; tuiles servies jusqu'au zoom 15 ;
     - couches internes dessinées : `sequences` (lignes violettes `#54278f`, comme le viewer) et
       `pictures` (points, en dessous de 2,4 m/px) ; `grid` (petits zooms) ignorée ;
-    - **GEO n'expose pas sa carte OpenLayers** : elle est cherchée par duck typing (`getLayers`,
-      `getView`, `addLayer`, `getViewport`) dans `geoApplication`, puis dans les scopes Angular, en
-      gardant la plus grande carte affichée (pas une carte de situation) ; classes prises dans
-      `window.ol`, celui de GEO (une autre copie d'OpenLayers ne marcherait pas avec sa carte).
-      Si l'un manque : message en console, rien d'autre ;
+    - **L'API GEO ne permet pas d'ajouter une couche** : la carte OpenLayers est obtenue par
+      `acfMapService.getMapViewImmediate().getNativeMap()` (service interne, le même que les autres
+      modules cartographiques) ; classes prises dans `window.ol`, celui de GEO (une autre copie
+      d'OpenLayers ne marcherait pas avec sa carte). Si l'un manque : message en console, rien d'autre ;
     - carte en EPSG:3857 : `ol.layer.VectorTile` natif. Autre projection (ex. Lambert 93) :
       OpenLayers ne reprojette pas les tuiles vectorielles, le module charge donc les tuiles Web
       Mercator de l'emprise et reprojette leurs objets dans un `ol.layer.Vector`, vidé et rechargé
