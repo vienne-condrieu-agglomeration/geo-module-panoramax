@@ -142,7 +142,10 @@ version à l'autre :
     - hauteur de caméra = réglage `cameraHeight` (2,5 m par défaut), **supposée**, pas lue dans
       la photo ; visée refusée à moins de 2° sous l'horizon ou au-delà de 40 m ;
     - incertitude = `quality:horizontal_accuracy` (5 m si absent) combinée à ±0,3 m sur la
-      hauteur, affichée en ± m dans la liste et l'infobulle (pas de cercle sur la carte) ;
+      hauteur, affichée en « incertitude estimée ± m » dans la liste et l'infobulle (pas de cercle sur la carte) ;
+    - **fonctionnalité expérimentale** : aucune mesure ne valide la précision. Bandeau d'avertissement
+      permanent dans le panneau de pointage, mention dans l'infobulle du bouton et la visite, colonne /
+      propriété `avertissement` dans les exports (ajout, `incertitude_m` inchangé) ;
     - points gardés en mémoire (perdus au rechargement de la page), exportables en GeoJSON et
       CSV (`;`, BOM UTF-8). Pas de couche GEO éditable, pas de triangulation, pas de rayon de
       visée : voir l'issue. Photos plates : `sphereCorrection` (inclinaison de la caméra)

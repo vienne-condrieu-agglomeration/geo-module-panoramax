@@ -11,6 +11,14 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.10.0] — 2026-11-02
+
+### Modifié
+
+- « Pointer un objet sur la photo » est signalé comme **expérimental** : un avertissement reste affiché tant que le panneau de pointage est ouvert (précision des points non garantie, à vérifier sur le terrain), et la mention figure aussi dans l'infobulle du bouton et dans la visite guidée
+- L'incertitude affichée pour chaque point est désormais présentée comme une **incertitude estimée** (liste et infobulle des points)
+- Les exports GeoJSON et CSV des points portent une nouvelle information « avertissement » (« expérimental, précision non garantie »), pour que la mention suive le fichier hors de GEO ; les autres champs sont inchangés
+
 ## [1.9.1] — 2026-11-02
 
 ### Corrigé

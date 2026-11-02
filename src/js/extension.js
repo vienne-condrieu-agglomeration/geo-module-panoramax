@@ -223,7 +223,7 @@ angular
                 '    </button>',
                 '    <button class="geo-pnx-point-btn" ng-class="{\'geo-pnx-fullscreen-btn--active\': pointing}"',
                 '            ng-click="togglePointing()" ng-disabled="!currentPicId"',
-                '            data-tip="Pointer un objet sur la photo" aria-label="Pointer un objet sur la photo">',
+                '            data-tip="Pointer un objet sur la photo (expérimental)" aria-label="Pointer un objet sur la photo (fonctionnalité expérimentale)">',
                 '      ' + _LUCIDE.crosshair,
                 '    </button>',
                 '    <button class="geo-pnx-changelog-btn" ng-click="openChangelog()" data-tip="{{ changelogTitle }}" aria-label="Nouveautés du module">',
@@ -241,6 +241,12 @@ angular
                 '    </div>',
                 '  </div>',
                 '  <div class="geo-pnx-points" ng-if="confirmed && (pointing || points.length)">',
+                // Avertissement permanent tant que le panneau de pointage est affiché : aucune mesure
+                // ne permet aujourd'hui de garantir la précision des positions calculées.
+                '    <div class="geo-pnx-warning" role="note">',
+                '      <strong>Fonctionnalité expérimentale.</strong> La précision des points n\'est pas garantie :',
+                '      ne vous y fiez pas, vérifiez toujours sur le terrain ou sur une source fiable.',
+                '    </div>',
                 '    <div class="geo-pnx-points-bar">',
                 '      <label>Type :',
                 '        <select ng-model="pointInput.type" ng-options="t for t in pointTypes"></select>',
@@ -252,7 +258,7 @@ angular
                 '    </div>',
                 '    <ul class="geo-pnx-points-list">',
                 '      <li ng-repeat="pt in points">',
-                '        <span>{{ pt.index }}. {{ pt.type }} — ±{{ pt.accuracy }} m</span>',
+                '        <span>{{ pt.index }}. {{ pt.type }} — incertitude estimée ±{{ pt.accuracy }} m</span>',
                 '        <button class="geo-pnx-points-del" ng-click="removePoint(pt)" title="Supprimer ce point">×</button>',
                 '      </li>',
                 '    </ul>',
@@ -1052,7 +1058,7 @@ angular
                 imageUrl:    'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
                 size:        { w: 28, h: 28 },
                 positioning: 'center-center',
-                tooltip:     { title: pt.index + '. ' + pt.type + ' (±' + pt.accuracy + ' m)' }
+                tooltip:     { title: pt.index + '. ' + pt.type + ' (incertitude estimée ±' + pt.accuracy + ' m)' }
             }]).subscribe(function () {}, function (err) {
                 console.error('[geo-panoramax] addMarkers (point) a échoué :', err);
             });
@@ -1090,6 +1096,9 @@ angular
             setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
         }
 
+        // Mention portée par chaque point exporté : le fichier est lu hors du module, sans le bandeau.
+        var _EXPORT_WARNING = 'expérimental, précision non garantie';
+
         function _exportPoints(format) {
             if (!_points.length) { return; }
             var stamp = new Date().toISOString().slice(0, 10);
@@ -1103,7 +1112,7 @@ angular
                             properties: {
                                 type: pt.type, incertitude_m: pt.accuracy, distance_camera_m: pt.distance,
                                 cap: pt.heading, hauteur_camera_m: _cameraHeight, photo: pt.picId,
-                                sequence: pt.seqId, date_pointage: pt.date
+                                sequence: pt.seqId, date_pointage: pt.date, avertissement: _EXPORT_WARNING
                             }
                         };
                     })
@@ -1113,10 +1122,10 @@ angular
             // CSV séparé par des points-virgules (ouverture directe dans Excel en français),
             // avec BOM UTF-8 pour les accents.
             var rows = [['type', 'lon', 'lat', 'incertitude_m', 'distance_camera_m', 'cap',
-                         'hauteur_camera_m', 'photo', 'sequence', 'date_pointage']];
+                         'hauteur_camera_m', 'photo', 'sequence', 'date_pointage', 'avertissement']];
             _points.forEach(function (pt) {
                 rows.push([pt.type, pt.lon.toFixed(7), pt.lat.toFixed(7), pt.accuracy, pt.distance,
-                           pt.heading, _cameraHeight, pt.picId || '', pt.seqId || '', pt.date]);
+                           pt.heading, _cameraHeight, pt.picId || '', pt.seqId || '', pt.date, _EXPORT_WARNING]);
             });
             _download('panoramax-points-' + stamp + '.csv', 'text/csv;charset=utf-8',
                 '\ufeff' + rows.map(function (r) { return r.join(';'); }).join('\r\n'));
@@ -1432,10 +1441,10 @@ angular
                     // Bouton grisé tant qu'aucune photo n'est affichée : pas d'avance au clic, « Suivant » seulement.
                     element: '.geo-pnx-point-btn',
                     popover: { title: 'Pointer un objet',
-                               description: 'Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.',
+                               description: 'Fonctionnalité expérimentale, précision non garantie. Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.',
                                side: 'left', align: 'center', showButtons: ['close'] },
                     onHighlightStarted: function (element, step) {
-                        var base = 'Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.';
+                        var base = 'Fonctionnalité expérimentale, précision non garantie. Activez ce bouton puis cliquez sur le pied d\'un objet au sol (grille, regard, candélabre…) : un point est posé sur la carte, avec son incertitude. Les points s\'exportent en GeoJSON ou en CSV.';
                         step.popover.description = base + (element && element.disabled ? ' (Disponible une fois une photo affichée.)' : '');
                     },
                     data: { id: 'point', closable: true, buttons: [prev, next] }
@@ -1534,6 +1543,8 @@ angular
                 '  border-color:#1a73e8;}',
                 '.geo-pnx-points{flex-shrink:0;border-top:1px solid #ddd;background:#f7f7f7;',
                 '  font-size:12px;}',
+                '.geo-pnx-warning{margin:0;padding:7px 12px;background:#fff4e5;color:#7a4100;',
+                '  border-bottom:1px solid #f0c78a;font-size:12px;line-height:1.4;}',
                 '.geo-pnx-points-bar{display:flex;align-items:center;gap:6px;padding:6px 12px;flex-wrap:wrap;}',
                 '.geo-pnx-points-spacer{flex:1;}',
                 '.geo-pnx-points-list{list-style:none;margin:0;padding:0 12px 6px;max-height:110px;',
