@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.9.1] — 2026-11-02
+
+### Corrigé
+
+- Sécurité : le bouton « Ouvrir dans Panoramax » n'ouvre plus la page avec un accès à l'onglet GEO d'origine, et les identifiants de photo et de séquence sont encodés avant d'être placés dans une adresse
+
 ## [1.9.0] — 2026-11-02
 
 ### Ajouté

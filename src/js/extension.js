@@ -312,7 +312,8 @@ angular
                     // photo peut venir d'une autre instance que celle du site ouvert.
                     var url = siteUrl + '/?focus=pic&pic=' + encodeURIComponent($scope.currentPicId);
                     if ($scope.currentSeqId) { url += '&seq=' + encodeURIComponent($scope.currentSeqId); }
-                    window.open(url, '_blank');
+                    // noopener,noreferrer : la page ouverte n'a pas accès à window.opener (reverse tabnabbing)
+                    window.open(url, '_blank', 'noopener,noreferrer');
                 };
 
                 $scope.startTour = function () { _startTour(); };
@@ -609,7 +610,7 @@ angular
             var api = _viewerEl.getAPI();
             if (!api) { return; }
 
-            fetch(_instanceUrl + '/collections/' + seqId + '/items/' + picId)
+            fetch(_instanceUrl + '/collections/' + encodeURIComponent(seqId) + '/items/' + encodeURIComponent(picId))
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (item) {
                     if (item && item.geometry && item.geometry.coordinates) {
