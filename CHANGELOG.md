@@ -11,6 +11,8 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.9.0] — 2026-11-02
+
 ### Ajouté
 
 - Réglage du Générateur « Afficher les séquences et les photos sur la carte » (désactivé par défaut) : tant que le
