@@ -446,6 +446,9 @@ angular
                     $timeout(function () {
                         $scope.currentPicId = detail.picId || null;
                         $scope.currentSeqId = detail.seqId || null;
+                        // Une photo est affichée : un message « Aucune photo… » laissé par une
+                        // recherche précédente (ouverture, clic carte) ne serait plus vrai.
+                        if (detail.picId) { $scope.statusMessage = null; }
                     });
                     // "select" se déclenche parfois deux fois d'affilée pour une même photo
                     // (une fois pour la séquence, une fois pour la photo) : ne replacer le
@@ -589,6 +592,7 @@ angular
                     var feature = _pickPreferredFeature(features);
                     if (!feature) {
                         _setStatus('Aucune photo Panoramax trouvée à cet endroit.');
+                        _centerViewerMap(lonLat);
                         return;
                     }
                     _setStatus(null);
@@ -607,6 +611,21 @@ angular
                     console.error('[geo-panoramax] getPicturesAroundCoordinates a échoué :', err);
                     _setStatus('Erreur lors de la recherche de photos Panoramax (voir console).');
                 });
+        }
+
+        // Sans photo à l'endroit cherché, la carte interne du viewer garde sa vue par défaut
+        // (parfois le monde ou une autre commune) : on la centre sur le point cherché pour
+        // qu'elle reste alignée avec la carte GEO, en gardant le zoom s'il est déjà détaillé.
+        function _centerViewerMap(lonLat) {
+            var map = _viewerEl && _viewerEl.map;
+            if (!map || typeof map.jumpTo !== 'function') { return; }
+            try {
+                var opts = { center: lonLat };
+                if (typeof map.getZoom === 'function' && map.getZoom() < 14) { opts.zoom = 16; }
+                map.jumpTo(opts);
+            } catch (e) {
+                console.error('[geo-panoramax] centrage de la carte du viewer impossible :', e);
+            }
         }
 
         // Récupère les coordonnées de la photo courante via l'API STAC (item du catalogue)

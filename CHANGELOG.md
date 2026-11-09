@@ -11,6 +11,13 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.10.1] — 2026-11-09
+
+### Corrigé
+
+- Le message « Aucune photo Panoramax trouvée à cet endroit » ne reste plus affiché sous une photo visible
+- Quand aucune photo n'est trouvée à l'ouverture ou après un clic sur la carte, la carte intégrée à Panoramax se centre sur l'endroit de la carte GEO au lieu de rester sur une autre zone
+
 ## [1.10.0] — 2026-11-02
 
 ### Modifié
