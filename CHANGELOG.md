@@ -11,6 +11,8 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.11.0] — 2026-11-09
+
 ### Ajouté
 
 - Instance privée : un nouveau réglage « Instance privée (envoyer le cookie de session) » permet d'afficher les photos d'une instance Panoramax réservée aux utilisateurs connectés, ainsi que ses séquences sur la carte GEO. Il faut être connecté à l'instance dans le même navigateur, et ouvrir GEO sur le même domaine que l'instance (par exemple geo.mondomaine.fr et panoramax.mondomaine.fr)
