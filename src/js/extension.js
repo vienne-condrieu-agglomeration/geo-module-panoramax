@@ -59,6 +59,7 @@ angular
         var _markerPending  = false;
         var _pendingRecenter = false;
         var _FULLSCREEN_BODY_CLASS = 'geo-panoramax-fullscreen-active';
+        var _PANEL_BODY_CLASS = 'geo-pnx-panel-open'; // panneau ouvert : sert à décaler la barre d'annotation de GEO
 
         // Scope actif (widget) et référence à l'élément <pnx-viewer> courant
         var _currentScope  = null;
@@ -308,6 +309,26 @@ angular
                     document.body.classList.toggle(_FULLSCREEN_BODY_CLASS, $scope.isFullscreen);
                 };
 
+                // Barre d'annotation de GEO (.acf-feature-tools-bar, left/right 64px) : centrée sur
+                // toute la fenêtre, elle passe sous le panneau. On publie la distance entre le
+                // bord droit de la fenêtre et le bord gauche du panneau (variable CSS, cf. règle
+                // dans _injectStyles) pour la recentrer sur la partie visible de la carte.
+                var _panelResizeObs = null;
+                function _publishPanelOffset() {
+                    var el = _viewerEl || $element[0];
+                    var rect = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+                    if (!rect || rect.width < 50 || rect.left < 0 || rect.left > window.innerWidth) { return; }
+                    document.documentElement.style.setProperty('--geo-pnx-panel-right', (window.innerWidth - rect.left) + 'px');
+                    document.body.classList.add(_PANEL_BODY_CLASS);
+                }
+                // « resize » est aussi émis par _requestPanelWidth après chaque changement de largeur.
+                window.addEventListener('resize', _publishPanelOffset);
+                if (typeof ResizeObserver === 'function') {
+                    _panelResizeObs = new ResizeObserver(_publishPanelOffset);
+                    _panelResizeObs.observe($element[0]);
+                }
+                $timeout(_publishPanelOffset, 0, false);
+
                 $scope.openExternally = function () {
                     if (!$scope.currentPicId) { return; }
                     // Le lien vise le site web public, pas l'API : URL du site configurée, sinon
@@ -522,6 +543,10 @@ angular
                         _pointerClickSub = null;
                     }
                     document.body.classList.remove(_FULLSCREEN_BODY_CLASS);
+                    window.removeEventListener('resize', _publishPanelOffset);
+                    if (_panelResizeObs) { _panelResizeObs.disconnect(); _panelResizeObs = null; }
+                    document.body.classList.remove(_PANEL_BODY_CLASS);
+                    document.documentElement.style.removeProperty('--geo-pnx-panel-right');
                     _viewerEl = null;
                     _currentScope = null;
                     _removeMarker();
@@ -1584,6 +1609,8 @@ angular
                 // toolbar de dessin/sélection (topright) se replie et chevauche le toolbar
                 // zoom/géoloc/permalien (topleft). On le masque tant que c'est le cas.
                 'body.' + _FULLSCREEN_BODY_CLASS + ' .acf-map-controls-topright{display:none!important;}',
+                // Barre d'annotation de GEO recentrée à gauche du panneau (hors plein écran, où la carte est masquée).
+                'body.' + _PANEL_BODY_CLASS + ':not(.' + _FULLSCREEN_BODY_CLASS + ') .acf-feature-tools-bar{right:var(--geo-pnx-panel-right,64px);}',
 
                 '.geo-pnx-status{padding:8px 12px;font-size:12px;color:#666;background:#f7f7f7;',
                 '  border-top:1px solid #ddd;flex-shrink:0;}',

@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.10.2] — 2026-11-09
+
+### Corrigé
+
+- Avec le panneau Panoramax ouvert, la barre d'outils d'annotation de GEO (dessin, mesure) se place à gauche du panneau au lieu de passer dessous : tous les outils restent accessibles
+
 ## [1.10.1] — 2026-11-09
 
 ### Corrigé
