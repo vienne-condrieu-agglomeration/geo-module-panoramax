@@ -218,8 +218,8 @@ angular
                 '      <span ng-if="!isFullscreen">' + _LUCIDE.maximize + '</span>',
                 '      <span ng-if="isFullscreen">' + _LUCIDE.minimize + '</span>',
                 '    </button>',
-                '    <button class="geo-pnx-open-btn" ng-if="currentPicId" ng-click="openExternally()"',
-                '            data-tip="Ouvrir dans Panoramax" aria-label="Ouvrir dans Panoramax">',
+                '    <button class="geo-pnx-open-btn" ng-click="openExternally()" ng-disabled="!currentPicId"',
+                '            data-tip="{{ currentPicId ? \'Ouvrir dans Panoramax\' : \'Ouvrir dans Panoramax (aucune photo affichée)\' }}" aria-label="Ouvrir dans Panoramax">',
                 '      ' + _LUCIDE.link,
                 '    </button>',
                 '    <button class="geo-pnx-point-btn" ng-class="{\'geo-pnx-fullscreen-btn--active\': pointing}"',
@@ -1468,8 +1468,7 @@ angular
                     data: { id: 'fullscreen', closable: true, buttons: [prev, next] }
                 },
                 {
-                    // Bouton absent si aucune photo n'est affichée : la bulle est alors centrée
-                    // (élément résolu à l'affichage) et le texte le précise.
+                    // Bouton grisé tant qu'aucune photo n'est affichée : le texte le précise.
                     element: function () { return document.querySelector('.geo-pnx-open-btn'); },
                     advanceOnClick: true,
                     popover: { title: 'Ouvrir dans Panoramax',
@@ -1477,7 +1476,7 @@ angular
                                side: 'left', align: 'center', showButtons: ['close'] },
                     onHighlightStarted: function (element, step) {
                         step.popover.description = 'Ouvre la photo affichée dans une nouvelle fenêtre, sur le site Panoramax.' +
-                            (element ? '' : ' (Ce bouton apparaît une fois qu\'une photo est affichée.)');
+                            (element && element.disabled ? ' (Disponible une fois une photo affichée.)' : '');
                     },
                     data: { id: 'open-externally', closable: true, buttons: [prev, next] }
                 },
@@ -1545,7 +1544,8 @@ angular
                 '  border-radius:50%;width:42px;height:42px;border:1px solid rgb(137,137,137);',
                 '  background:rgb(255,255,255);cursor:pointer;display:flex;',
                 '  align-items:center;justify-content:center;font-size:18px;}',
-                '.geo-pnx-open-btn:hover{background:rgba(255,255,255,.95);}',
+                '.geo-pnx-open-btn:hover:not(:disabled){background:rgba(255,255,255,.95);}',
+                '.geo-pnx-open-btn:disabled{opacity:.5;cursor:default;}',
                 '.geo-pnx-icon{width:20px;height:20px;display:block;}',
                 '.geo-pnx-open-btn,.geo-pnx-fullscreen-btn,.geo-pnx-help-btn{color:#444;padding:0;}',
                 '.geo-pnx-open-btn span,.geo-pnx-fullscreen-btn span,.geo-pnx-help-btn span{',

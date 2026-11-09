@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.10.3] — 2026-11-09
+
+### Modifié
+
+- Le bouton « Ouvrir dans Panoramax » reste affiché, grisé, quand aucune photo n'est disponible, comme le bouton « Pointer un objet », au lieu de disparaître : les boutons gardent leur place
+
 ## [1.10.2] — 2026-11-09
 
 ### Corrigé
