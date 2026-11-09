@@ -11,6 +11,15 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+### Ajouté
+
+- Instance privée : un nouveau réglage « Instance privée (envoyer le cookie de session) » permet d'afficher les photos d'une instance Panoramax réservée aux utilisateurs connectés, ainsi que ses séquences sur la carte GEO. Il faut être connecté à l'instance dans le même navigateur, et ouvrir GEO sur le même domaine que l'instance (par exemple geo.mondomaine.fr et panoramax.mondomaine.fr)
+
+### Corrigé
+
+- Sur une carte GEO dans une autre projection que Web Mercator (Lambert 93…), le tracé des séquences ne disparaît plus au premier zoom, et la carte ne clignote plus à chaque changement d'échelle : l'ancien tracé reste affiché jusqu'à l'arrivée du nouveau
+- L'application GEO ne se recharge plus après l'affichage d'une photo, et une ancienne photo ne se rouvre plus toute seule au chargement de l'application : le visualiseur ne modifie plus l'adresse de la page
+
 ## [1.10.3] — 2026-11-09
 
 ### Modifié

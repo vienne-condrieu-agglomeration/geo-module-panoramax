@@ -17,6 +17,7 @@ angular
         // Configuration (remplie depuis le générateur GEO)
         // ============================================================
         var _instanceUrl       = 'https://api.panoramax.xyz/api';
+        var _privateInstance   = false; // true : envoie le cookie de session à l'instance (photos réservées aux connectés)
         var _siteUrl           = null; // site web public ; si vide, déduit de _instanceUrl
         var _searchRadius      = 0.0005;
         var _preferredUser          = null; // nom d'utilisateur ou UUID, insensible à la casse
@@ -86,6 +87,7 @@ angular
                 _showTourOnStart  = props.showTourOnStart !== false && props.showTourOnStart !== 'false';
                 _cameraHeight     = parseFloat(props.cameraHeight) || _cameraHeight;
                 _showCoverageLayer = props.showCoverageLayer === true || props.showCoverageLayer === 'true';
+                _privateInstance  = props.privateInstance === true || props.privateInstance === 'true';
             }
 
             if (!_registered) {
@@ -208,7 +210,12 @@ angular
                 // attribut statique déclenche attributeChangedCallback avant que le
                 // sous-composant carte interne du viewer soit prêt (Uncaught Error:
                 // Map is not enabled) — on laisse le défaut faire son travail.
-                '    <pnx-viewer class="geo-pnx-viewer"></pnx-viewer>',
+                // url-parameters="false" : le viewer ne réécrit plus l'adresse de la page GEO
+                // (?focus=…&pic=…&seq=…, pushState à chaque photo). Dans GEO, ce changement
+                // d'adresse fait recharger l'application, et les paramètres laissés dans l'adresse
+                // rouvraient une ancienne photo au chargement suivant. Lu dans connectedCallback :
+                // il doit donc être présent dès l'insertion (attribut statique, pas une valeur par défaut).
+                '    <pnx-viewer class="geo-pnx-viewer" url-parameters="false"></pnx-viewer>',
                 // Colonne de boutons flottants, de haut en bas : plein écran, ouvrir dans Panoramax, pointage,
                 // nouveautés, aide (visite guidée). L'infobulle (data-tip, CSS) apparaît dès le survol : le title
                 // natif tardait ou n'apparaissait pas dans GEO.
@@ -496,6 +503,13 @@ angular
                 function _initViewer() { $timeout(function () {
                     _viewerEl = $element[0].querySelector('pnx-viewer');
                     if (!_viewerEl) { return; }
+                    // Instance privée : le visualiseur joint lui aussi le cookie (API, tuiles, images 360°).
+                    // ATTENTION À L'ORDRE : poser « endpoint » crée l'API du viewer sur-le-champ
+                    // (attributeChangedCallback → _setupAPI) avec la valeur de « fetch-options » à cet
+                    // instant ; l'attribut posé après n'a plus d'effet (recherche et tuiles anonymes).
+                    if (_privateInstance) {
+                        _viewerEl.setAttribute('fetch-options', JSON.stringify({ credentials: 'include' }));
+                    }
                     // L'attribut endpoint doit être posé en JS (pas via {{}}) : le custom
                     // element lit ses attributs dans connectedCallback, avant que le digest
                     // Angular n'ait eu la chance d'interpoler le template (cf. démo officielle
@@ -655,12 +669,18 @@ angular
 
         // Récupère les coordonnées de la photo courante via l'API STAC (item du catalogue)
         // pour repositionner le marqueur quand l'utilisateur navigue dans le viewer.
+        // Options de requête vers l'instance : avec une instance privée, le navigateur joint le cookie de session
+        // (l'instance doit autoriser le domaine de GEO en CORS avec Access-Control-Allow-Credentials).
+        function _fetchOpts() {
+            return _privateInstance ? { credentials: 'include' } : undefined;
+        }
+
         function _placeMarkerForPicture(seqId, picId) {
             if (!_viewerEl || !_viewerEl.getAPI) { return; }
             var api = _viewerEl.getAPI();
             if (!api) { return; }
 
-            fetch(_instanceUrl + '/collections/' + encodeURIComponent(seqId) + '/items/' + encodeURIComponent(picId))
+            fetch(_instanceUrl + '/collections/' + encodeURIComponent(seqId) + '/items/' + encodeURIComponent(picId), _fetchOpts())
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (item) {
                     if (item && item.geometry && item.geometry.coordinates) {
@@ -760,7 +780,7 @@ angular
         function _coverageTilesUrl() {
             if (!_covUrl) {
                 var fallback = _instanceUrl + '/map/{z}/{x}/{y}.mvt';
-                _covUrl = fetch(_instanceUrl)
+                _covUrl = fetch(_instanceUrl, _fetchOpts())
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (landing) {
                         var links = (landing && landing.links) || [];
@@ -798,7 +818,10 @@ angular
             _covMap = map;
             if (!_covLayer) {
                 var projection = map.getView().getProjection().getCode();
-                _covLayer = projection === 'EPSG:3857'
+                // Instance privée : la couche de tuiles vectorielles native charge ses tuiles sans le
+                // cookie de session (séquences réservées absentes de la carte). On passe alors par le
+                // chargement manuel (fetch avec credentials), qui sert aussi aux autres projections.
+                _covLayer = projection === 'EPSG:3857' && !_privateInstance
                     ? _buildVectorTileLayer(url)
                     : _buildReprojectedLayer(url, map);
                 _covLayer.setZIndex(_COVERAGE_ZINDEX);
@@ -846,41 +869,98 @@ angular
             });
         }
 
-        // Autre projection (ex. Lambert 93) : OpenLayers ne reprojette pas les tuiles vectorielles.
-        // On charge donc nous-mêmes les tuiles Web Mercator de l'emprise affichée et on reprojette
-        // leurs objets dans une couche vectorielle simple. Au changement de niveau de tuiles, la
-        // couche est vidée et rechargée (sinon on garderait les tuiles du zoom précédent, sans photos).
+        // Autre projection (ex. Lambert 93), ou instance privée : OpenLayers ne reprojette pas les tuiles
+        // vectorielles, et sa couche de tuiles native n'envoie pas le cookie de session. Le module charge
+        // donc lui-même (fetch, avec credentials si instance privée) les tuiles Web Mercator de l'emprise
+        // affichée et reprojette leurs objets dans une couche vectorielle simple.
+        // Le chargement est piloté par le module à chaque fin de déplacement (moveend), et non par la
+        // stratégie de chargement d'OpenLayers : avec la version d'OpenLayers de GEO, vider la source au
+        // changement de niveau ne relançait pas le chargement (tracé perdu au premier zoom, constaté le 09/11).
         function _buildReprojectedLayer(url, map) {
             var ol      = window.ol;
             var grid    = ol.tilegrid.createXYZ({ tileSize: 512, maxZoom: _COVERAGE_MAX_Z });
             var format  = new ol.format.MVT({ featureClass: ol.Feature });
-            var loaded  = {};
-            var gen     = 0;
+            var world   = ol.proj.get('EPSG:3857').getExtent();
+            var source  = new ol.source.Vector({ attributions: '© contributeurs Panoramax' });
+            var tiles   = {};   // clé z/x/y → { features: objets ajoutés (null tant que la tuile charge),
+                                //              loading: compte encore dans « pending » }
+            var stale   = [];   // objets du niveau précédent, retirés quand le nouveau niveau est complet
+            var pending = 0;    // tuiles du niveau courant encore en cours de chargement
+            var gen     = 0;    // incrémenté à chaque changement de niveau : réponses périmées ignorées
             var tileZ   = null;
 
-            function zFor(extent, resolution, projection) {
-                var ext = ol.proj.transformExtent(extent, projection, 'EPSG:3857');
-                var res = (ext[2] - ext[0]) / ((extent[2] - extent[0]) / resolution);
-                return { z: grid.getZForResolution(res, 0), ext: ext };
+            function removeFeatures(features) {
+                features.forEach(function (f) { source.removeFeature(f); });
             }
 
-            var source = new ol.source.Vector({
-                strategy:     ol.loadingstrategy.bbox,
-                attributions: '© contributeurs Panoramax',
-                loader: function (extent, resolution, projection) {
-                    var t = zFor(extent, resolution, projection);
-                    var myGen = gen;
-                    tileZ = t.z;
-                    grid.forEachTileCoord(t.ext, t.z, function (tc) {
-                        var y = tc[2] < 0 ? -tc[2] - 1 : tc[2]; // OpenLayers < 6 : y négatif
-                        var key = tc[0] + '/' + tc[1] + '/' + y;
-                        if (loaded[key]) { return; }
-                        loaded[key] = true;
-                        fetch(url.replace('{z}', tc[0]).replace('{x}', tc[1]).replace('{y}', y))
-                            .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
-                            .then(function (buf) {
-                                if (!buf || myGen !== gen) { return; }
-                                var features = format.readFeatures(buf, {
+            // Retire l'ancien niveau une fois toutes les tuiles du nouveau arrivées : pas de carte vide
+            // (scintillement) entre deux niveaux.
+            function flushStale() {
+                if (pending === 0 && stale.length) {
+                    removeFeatures(stale);
+                    stale = [];
+                }
+            }
+
+            function refresh() {
+                var size = map.getSize();
+                if (!size || !size[0] || !size[1]) { return; }
+                var view       = map.getView();
+                var projection = view.getProjection();
+                var ext = ol.proj.transformExtent(view.calculateExtent(size), projection, 'EPSG:3857');
+                // Résolution Web Mercator équivalente à l'affichage (m/px), quelle que soit la projection.
+                var z = grid.getZForResolution((ext[2] - ext[0]) / size[0], 0);
+                // Changement de niveau : les objets affichés deviennent « anciens » (gardés jusqu'à
+                // l'arrivée du nouveau niveau), les chargements en cours sont abandonnés.
+                if (z !== tileZ) {
+                    gen++;
+                    tileZ = z;
+                    pending = 0;
+                    Object.keys(tiles).forEach(function (k) {
+                        if (tiles[k].features) { stale = stale.concat(tiles[k].features); }
+                    });
+                    tiles = {};
+                }
+                // Tuiles à garder : l'emprise affichée élargie d'une demi-largeur de chaque côté (un petit
+                // déplacement ne recharge rien), bornée au monde Web Mercator.
+                var dx = (ext[2] - ext[0]) / 2, dy = (ext[3] - ext[1]) / 2;
+                var keep = [Math.max(ext[0] - dx, world[0]), Math.max(ext[1] - dy, world[1]),
+                            Math.min(ext[2] + dx, world[2]), Math.min(ext[3] + dy, world[3])];
+                ext = [Math.max(ext[0], world[0]), Math.max(ext[1], world[1]),
+                       Math.min(ext[2], world[2]), Math.min(ext[3], world[3])];
+                if (ext[0] >= ext[2] || ext[1] >= ext[3]) { return; }
+
+                var wanted = {};
+                function keyOf(tc) {
+                    var y = tc[2] < 0 ? -tc[2] - 1 : tc[2]; // OpenLayers < 6 : y négatif
+                    return { key: tc[0] + '/' + tc[1] + '/' + y, y: y };
+                }
+                grid.forEachTileCoord(keep, z, function (tc) { wanted[keyOf(tc).key] = true; });
+
+                // Même niveau : on retire les tuiles sorties de la zone gardée (la couche ne grossit pas
+                // indéfiniment au fil d'un déplacement).
+                Object.keys(tiles).forEach(function (k) {
+                    if (!wanted[k]) {
+                        if (tiles[k].features) { removeFeatures(tiles[k].features); }
+                        if (tiles[k].loading) { tiles[k].loading = false; pending--; } // chargement abandonné
+                        delete tiles[k];
+                    }
+                });
+
+                var myGen = gen;
+                grid.forEachTileCoord(ext, z, function (tc) {
+                    var k = keyOf(tc);
+                    if (tiles[k.key]) { return; }
+                    var entry = { features: null, loading: true };
+                    tiles[k.key] = entry;
+                    pending++;
+                    fetch(url.replace('{z}', tc[0]).replace('{x}', tc[1]).replace('{y}', k.y), _fetchOpts())
+                        .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+                        .then(function (buf) {
+                            if (myGen !== gen || tiles[k.key] !== entry) { return; }
+                            var features = [];
+                            if (buf && buf.byteLength) {
+                                features = format.readFeatures(buf, {
                                     extent: grid.getTileCoordExtent(tc), featureProjection: 'EPSG:3857'
                                 });
                                 features.forEach(function (f) {
@@ -888,26 +968,26 @@ angular
                                     if (g) { g.transform('EPSG:3857', projection); }
                                 });
                                 source.addFeatures(features);
-                            })
-                            .catch(function (err) {
-                                delete loaded[key];
-                                console.error('[geo-panoramax] tuile Panoramax ' + key + ' non chargée :', err);
-                            });
-                    });
-                }
-            });
+                            }
+                            entry.features = features;
+                        })
+                        .catch(function (err) {
+                            if (myGen === gen && tiles[k.key] === entry) { delete tiles[k.key]; }
+                            console.error('[geo-panoramax] tuile Panoramax ' + k.key + ' non chargée :', err);
+                        })
+                        .then(function () {
+                            if (myGen !== gen || !entry.loading) { return; }
+                            entry.loading = false;
+                            pending--;
+                            flushStale();
+                        });
+                });
+                flushStale();
+            }
 
             var layer = new ol.layer.Vector({ source: source, style: _coverageStyle() });
-            layer.set('pnxOnMoveEnd', function () {
-                var view = map.getView();
-                var t = zFor(view.calculateExtent(map.getSize()), view.getResolution(), view.getProjection());
-                if (tileZ !== null && t.z !== tileZ) {
-                    gen++;
-                    loaded = {};
-                    tileZ = null;
-                    source.clear(); // vide aussi les emprises déjà chargées : le loader repasse
-                }
-            });
+            // Appelée par _addCoverageLayer à chaque moveend et une fois à l'ajout de la couche.
+            layer.set('pnxOnMoveEnd', refresh);
             return layer;
         }
 

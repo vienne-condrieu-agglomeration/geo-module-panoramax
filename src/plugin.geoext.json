@@ -36,6 +36,15 @@
         },
         {
           "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Instance privée (envoyer le cookie de session)",
+          "description": "À activer si les photos de l'instance ne sont visibles qu'une fois connecté. Le module joint alors le cookie de session à ses requêtes : l'utilisateur doit être connecté à l'instance dans le même navigateur, et l'instance doit autoriser le domaine de GEO en CORS avec les cookies (Access-Control-Allow-Credentials). Laisser désactivé pour une instance publique. GEO doit être ouvert sur le même domaine que l'instance (ex. geo.mondomaine.fr et panoramax.mondomaine.fr) : depuis un autre domaine (ex. geoservices.business-geografic.com), le navigateur n'envoie pas le cookie et les photos réservées restent invisibles.",
+          "key": "privateInstance",
+          "required": false,
+          "type": "BOOLEAN",
+          "defaultValue": false
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
           "name": "URL du site web Panoramax",
           "description": "URL du site web public de l'instance, utilisée par le bouton « Ouvrir dans Panoramax ». Laisser vide pour la déduire de l'URL de l'API en retirant le suffixe /api (convient quand le site et l'API partagent le même domaine, ex. https://api.panoramax.xyz/api → https://api.panoramax.xyz). Attention : ce doit être le site de la MÊME instance que l'API ; avec un méta-catalogue (api.panoramax.xyz), ne pas mettre le site d'une seule instance (ex. panoramax.ign.fr) : les photos des autres instances n'y existent pas.",
           "key": "panoramaxSiteUrl",
