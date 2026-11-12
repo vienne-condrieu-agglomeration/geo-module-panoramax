@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.13.0] — 2026-11-12
+
+### Ajouté
+
+- Instance privée : quand vous n'êtes pas connecté à l'instance, un bandeau « Se connecter à Panoramax » apparaît dans le panneau. Un clic ouvre une petite fenêtre de connexion qui se referme toute seule (si votre session SSO est déjà ouverte, vous n'avez rien à saisir), puis le visualiseur se recharge avec vos photos, sans passer par un onglet Panoramax
+
 ## [1.12.1] — 2026-11-12
 
 ### Corrigé

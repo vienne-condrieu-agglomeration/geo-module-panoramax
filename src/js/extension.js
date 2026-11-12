@@ -215,6 +215,13 @@ angular
                 '      <button class="geo-pnx-btn geo-pnx-btn--primary" ng-click="accept(false)">Oui</button>',
                 '    </div>',
                 '  </div>',
+                // Instance privée, utilisateur non connecté : bandeau de connexion (fenêtre qui se referme seule).
+                '  <div class="geo-pnx-login" ng-if="loginNeeded" role="note">',
+                '    <span>Cette instance Panoramax est réservée aux utilisateurs connectés.</span>',
+                '    <button class="geo-pnx-btn geo-pnx-btn--primary" ng-click="login()" ng-disabled="loginPending">',
+                '      {{ loginPending ? \'Connexion en cours…\' : \'Se connecter à Panoramax\' }}',
+                '    </button>',
+                '  </div>',
                 '  <div class="geo-pnx-viewer-wrap" ng-if="confirmed">',
                 // focus="pic" est déjà la valeur par défaut du composant : le poser en
                 // attribut statique déclenche attributeChangedCallback avant que le
@@ -307,6 +314,8 @@ angular
                 $scope.confirmed       = !_confirmBeforeOpen || _isNeverAsk();
                 $scope.declined        = false;
                 $scope.pointing        = false;
+                $scope.loginNeeded     = false;
+                $scope.loginPending    = false;
                 $scope.points          = _points;
                 $scope.pointTypes      = _POINT_TYPES;
                 // Objet (et non primitive) : le select est dans un ng-if, donc un scope enfant.
@@ -511,6 +520,82 @@ angular
 
                 $scope.decline = function () { $scope.declined = true; };
 
+                // ---- Connexion automatique (instance privée) ----
+                // La connexion passe par une fenêtre vers /auth/login : avec le SSO déjà ouvert (Entra ID via
+                // Keycloak), la chaîne de redirections aboutit sans saisie. GEO ne peut pas lire l'adresse de la
+                // fenêtre (autre site) : il sonde /users/me (toutes les 250 ms) jusqu'à ce que la session existe, puis la ferme.
+                var _loginTimer = null;
+                var _loginWin = null;
+
+                // true : connecté ; false : non connecté ; null : indéterminé (réseau, CORS).
+                // redirect:'manual' : sans session, l'API répond 302 vers Keycloak, qu'un fetch suivrait
+                // jusqu'à un échec CORS ; la redirection non suivie (opaqueredirect) signifie « non connecté ».
+                function _checkLogin() {
+                    return fetch(_instanceUrl + '/users/me', { credentials: 'include', redirect: 'manual' })
+                        .then(function (r) { return r.type === 'opaqueredirect' ? false : (r.ok ? true : (r.status === 401 ? false : null)); })
+                        .catch(function () { return null; });
+                }
+
+                function _stopLoginPolling() {
+                    if (_loginTimer) { clearInterval(_loginTimer); _loginTimer = null; }
+                    if (_loginWin) { try { _loginWin.close(); } catch (e) { /* déjà fermée */ } _loginWin = null; }
+                    $scope.loginPending = false;
+                }
+
+                // Recrée le visualiseur : ses requêtes déjà faites sans session (recherche, tuiles) sont vides.
+                function _reloadViewerAfterLogin() {
+                    _stopFollowingViewerFilters();
+                    if (_psvEl) {
+                        _psvEl.removeEventListener('view-rotated', _onViewRotated);
+                        _psvEl.removeEventListener('picture-loaded', _onPictureLoaded);
+                        _psvEl.removeEventListener('click', _onPhotoClick);
+                        _psvEl = null;
+                    }
+                    _readyHandled = false;
+                    if (!$scope.confirmed) { return; }
+                    $scope.confirmed = false;
+                    $timeout(function () { $scope.confirmed = true; _initViewer(); });
+                }
+
+                $scope.login = function () {
+                    if ($scope.loginPending) { return; }
+                    var url = _instanceUrl + '/auth/login?next_url=' + encodeURIComponent(_instanceUrl + '/configuration');
+                    _loginWin = window.open(url, 'geo-pnx-login', 'width=520,height=640');
+                    if (!_loginWin) {
+                        $scope.statusMessage = 'Le navigateur a bloqué la fenêtre de connexion : autorisez les fenêtres surgissantes pour ce site.';
+                        return;
+                    }
+                    $scope.loginPending = true;
+                    var started = Date.now();
+                    var busy = false;
+                    // 250 ms : la page d'arrivée de la fenêtre (JSON de /configuration) n'est visible qu'un instant.
+                    _loginTimer = setInterval(function () {
+                        if (busy) { return; }
+                        busy = true;
+                        var closedByUser = _loginWin && _loginWin.closed;
+                        _checkLogin().then(function (state) {
+                            busy = false;
+                            if (!_loginTimer) { return; }
+                            if (state === true) {
+                                _stopLoginPolling();
+                                $scope.$evalAsync(function () { $scope.loginNeeded = false; $scope.statusMessage = null; _reloadViewerAfterLogin(); });
+                            } else if (closedByUser || Date.now() - started > 120000) {
+                                _stopLoginPolling();
+                                $scope.$evalAsync(function () {});
+                            }
+                        });
+                    }, 250);
+                };
+
+                if (_privateInstance) {
+                    // Le bandeau n'apparaît que si l'instance a une authentification et que l'utilisateur n'est pas connecté.
+                    fetch(_instanceUrl + '/configuration')
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (conf) { return conf && conf.auth && conf.auth.enabled ? _checkLogin() : null; })
+                        .then(function (state) { if (state === false) { $scope.$evalAsync(function () { $scope.loginNeeded = true; }); } })
+                        .catch(function () { /* état inconnu : pas de bandeau */ });
+                }
+
                 function _initViewer() { $timeout(function () {
                     _viewerEl = $element[0].querySelector('pnx-viewer');
                     if (!_viewerEl) { return; }
@@ -549,6 +634,7 @@ angular
                     _tourWaiting = null;
                     _hideMapAnchor();
                     _stopFollowingViewerFilters();
+                    _stopLoginPolling();
                     if (_viewerEl && _selectHandler) {
                         _viewerEl.removeEventListener('select', _selectHandler);
                     }
@@ -1758,6 +1844,9 @@ angular
                 '  border-color:#1a73e8;}',
                 '.geo-pnx-points{flex-shrink:0;border-top:1px solid #ddd;background:#f7f7f7;',
                 '  font-size:12px;}',
+                '.geo-pnx-login{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:10px;',
+                '  padding:8px 12px;background:#e8f0fe;color:#174ea6;border-bottom:1px solid #aecbfa;',
+                '  font-size:12px;line-height:1.4;}',
                 '.geo-pnx-warning{margin:0;padding:7px 12px;background:#fff4e5;color:#7a4100;',
                 '  border-bottom:1px solid #f0c78a;font-size:12px;line-height:1.4;}',
                 '.geo-pnx-points-bar{display:flex;align-items:center;gap:6px;padding:6px 12px;flex-wrap:wrap;}',
