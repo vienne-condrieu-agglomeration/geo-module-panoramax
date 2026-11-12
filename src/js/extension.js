@@ -5,6 +5,9 @@ import { createChangelog } from './changelog.js';
 import changelogMd from '../../CHANGELOG.md';
 import 'driver.js/dist/driver.css';
 
+// Cookie de session sur les tuiles de la mini-carte du visualiseur, instance privée (voir le fichier).
+import { installInstanceCredentials } from './panora-credentials.js';
+
 // Enregistre les web components <pnx-viewer>, <pnx-photo-viewer>, etc.
 import '@panoramax/web-viewer';
 
@@ -72,6 +75,9 @@ angular
         // ============================================================
         // Lecture config GEO Generator + enregistrement
         // ============================================================
+        // Instance privée : cookie joint aux tuiles de la mini-carte du visualiseur (de l'instance configurée seulement).
+        installInstanceCredentials(function (url) { return _privateInstance && _sameOrigin(url, _instanceUrl); });
+
         geoApplication.executeWhenInitialized(function () {
             var config = geoApplication.getConfigurationByExtensionKey(pluginConf.name);
 

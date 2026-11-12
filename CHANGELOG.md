@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.12.1] — 2026-11-12
+
+### Corrigé
+
+- Instance privée : le linéaire des séquences s'affiche maintenant dans la mini-carte du visualiseur (les tuiles de la mini-carte étaient demandées sans le cookie de session, et revenaient vides)
+
 ## [1.12.0] — 2026-11-12
 
 ### Ajouté
