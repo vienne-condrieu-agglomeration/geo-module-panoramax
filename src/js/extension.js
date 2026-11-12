@@ -84,8 +84,9 @@ angular
             if (config && config.length > 0) {
                 var props = config[0].properties;
 
-                _instanceUrl      = (props.panoramaxInstanceUrl || _instanceUrl).replace(/\/+$/, '');
-                _siteUrl          = (props.panoramaxSiteUrl || '').trim().replace(/\/+$/, '') || null;
+                _instanceUrl      = _httpUrlOr(props.panoramaxInstanceUrl, _instanceUrl, 'URL de l\'instance Panoramax').replace(/\/+$/, '');
+                _siteUrl          = _httpUrlOr(props.panoramaxSiteUrl, null, 'URL du site Panoramax');
+                if (_siteUrl) { _siteUrl = _siteUrl.replace(/\/+$/, '') || null; }
                 _searchRadius     = parseFloat(props.searchRadius) || _searchRadius;
                 _preferredUser    = (props.preferredUser || '').trim() || null;
                 _preferredUserCandidates = parseInt(props.preferredUserCandidates, 10) || _preferredUserCandidates;
@@ -969,6 +970,19 @@ angular
                     .catch(function () { return fallback; });
             }
             return _covUrl;
+        }
+
+        // URL de réglage acceptée seulement en http(s) (refuse javascript:, data:, etc., qui s'exécuteraient
+        // dans window.open) ; sinon valeur de repli, avec un message dans la console.
+        function _httpUrlOr(value, fallback, label) {
+            var v = (value == null ? '' : String(value)).trim();
+            if (!v) { return fallback; }
+            try {
+                var u = new URL(v);
+                if (u.protocol === 'https:' || u.protocol === 'http:') { return v; }
+            } catch (e) { /* URL invalide : repli ci-dessous */ }
+            console.error('[geo-panoramax] ' + label + ' ignorée (http ou https attendu) : ' + v);
+            return fallback;
         }
 
         // URL absolue de même origine que base (une URL relative est refusée : repli).

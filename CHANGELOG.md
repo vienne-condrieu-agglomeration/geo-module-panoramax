@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.13.1] — 2026-11-12
+
+### Corrigé
+
+- Les adresses de l'instance et du site Panoramax saisies dans les réglages ne sont acceptées qu'en http ou https ; une autre forme (par exemple « javascript: ») est ignorée, avec un message dans la console du navigateur
+
 ## [1.13.0] — 2026-11-12
 
 ### Ajouté
