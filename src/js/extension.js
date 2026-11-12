@@ -32,6 +32,9 @@ angular
         var _confirmBeforeOpen  = true;
         var _layerGroupName     = 'Panoramax'; // groupe de couches GEO affiché tant que le panneau est ouvert
         var _showTourOnStart    = true;        // accroche + visite guidée automatiques au premier lancement
+        var _pictureTypeDefault = null;        // réglage : null (toutes) | 'equirectangular' (360°) | 'flat' (plates)
+        var _pictureType        = null;        // filtre en cours : réglage à l'ouverture, puis choix de l'utilisateur dans le viewer
+        var _filterComposer     = null;        // gestionnaire de filtres du viewer (écouté pour suivre ses changements)
         var _showCoverageLayer  = false;       // séquences et photos dessinées sur la carte GEO tant que le panneau est ouvert
         var _registered         = false;
         var _widgetId           = null;
@@ -87,6 +90,7 @@ angular
                 _showTourOnStart  = props.showTourOnStart !== false && props.showTourOnStart !== 'false';
                 _cameraHeight     = parseFloat(props.cameraHeight) || _cameraHeight;
                 _showCoverageLayer = props.showCoverageLayer === true || props.showCoverageLayer === 'true';
+                _pictureTypeDefault = _pictureType = _parsePictureType(props.pictureType);
                 _privateInstance  = props.privateInstance === true || props.privateInstance === 'true';
             }
 
@@ -397,6 +401,7 @@ angular
                 function _onReady() {
                     if (_readyHandled) { return; }
                     _readyHandled = true;
+                    _applyViewerPictureFilter();
                     var extent = geoApplication.map && geoApplication.map.extent;
                     if (extent) {
                         var center = [(extent.minX + extent.maxX) / 2, (extent.minY + extent.maxY) / 2];
@@ -537,6 +542,7 @@ angular
                     if (_tour && _tour.isActive()) { _tour.destroy(); }
                     _tourWaiting = null;
                     _hideMapAnchor();
+                    _stopFollowingViewerFilters();
                     if (_viewerEl && _selectHandler) {
                         _viewerEl.removeEventListener('select', _selectHandler);
                     }
@@ -610,6 +616,80 @@ angular
             return features[0];
         }
 
+        // Réglage « type de photos » : le texte lisible du Générateur (ENUMERATED, les `labels` sont
+        // ignorés) est converti en valeur `pic_type` de Panoramax ; vide ou inconnu = toutes.
+        function _parsePictureType(value) {
+            var v = String(value == null ? '' : value).toLowerCase();
+            if (v.indexOf('360') !== -1) { return 'equirectangular'; }
+            if (v.indexOf('plate') !== -1) { return 'flat'; }
+            return null;
+        }
+
+        // Une photo à 360° annonce un champ de vision de 360 ; une photo plate n'en a pas (constaté
+        // sur api.panoramax.xyz).
+        function _matchesPictureType(feature) {
+            if (!_pictureType) { return true; }
+            var orient = feature && feature.properties && feature.properties['pers:interior_orientation'];
+            var is360 = !!orient && Number(orient.field_of_view) === 360;
+            return _pictureType === 'equirectangular' ? is360 : !is360;
+        }
+
+        // Recherche des photos autour d'un point. Avec un type de photos choisi, le filtre est demandé au
+        // serveur (`filter=field_of_view…`, STAC) ; si l'instance le refuse (ancienne version), repli sur
+        // une recherche sans filtre triée côté navigateur. Dans tous les cas le résultat est revérifié,
+        // car une instance peut aussi ignorer le filtre sans erreur.
+        function _searchPictures(api, lat, lon, limit) {
+            if (!_pictureType) {
+                return api.getPicturesAroundCoordinates(lat, lon, _searchRadius, limit);
+            }
+            var lim = Math.max(limit, 20);
+            var url = api.getPicturesAroundCoordinatesUrl(lat, lon, _searchRadius, lim) + '&filter=' +
+                encodeURIComponent(_pictureType === 'flat' ? 'field_of_view<360' : 'field_of_view=360');
+            return fetch(url, _fetchOpts())
+                .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+                .catch(function (err) {
+                    console.warn('[geo-panoramax] filtre serveur refusé, tri côté navigateur :', err);
+                    return api.getPicturesAroundCoordinates(lat, lon, _searchRadius, lim);
+                })
+                .then(function (fc) {
+                    var features = ((fc && fc.features) || []).filter(_matchesPictureType);
+                    return { features: features };
+                });
+        }
+
+        // Filtre de départ de la mini-carte du viewer (url-parameters="false" : pas de paramètre d'URL).
+        // L'utilisateur peut ensuite le changer dans le menu des filtres du viewer : le module suit ce
+        // choix (tracé sur la carte GEO, recherche au clic) via l'événement « filters-changed ».
+        function _applyViewerPictureFilter() {
+            _pictureType = _pictureTypeDefault; // chaque ouverture repart du réglage
+            if (_viewerEl && _viewerEl.mapStyleComposer && !_filterComposer) {
+                _filterComposer = _viewerEl.mapStyleComposer;
+                _filterComposer.addEventListener('filters-changed', _onViewerFiltersChanged);
+            }
+            if (!_pictureType) { return; }
+            if (!_viewerEl || !_viewerEl.map || typeof _viewerEl.map.setFilters !== 'function') {
+                console.error('[geo-panoramax] filtre de type de photos non appliqué à la mini-carte (viewer.map.setFilters absent).');
+                return;
+            }
+            try {
+                _viewerEl.map.setFilters({ pic_type: _pictureType });
+            } catch (e) {
+                console.error('[geo-panoramax] filtre de type de photos refusé par la mini-carte :', e);
+            }
+        }
+
+        function _onViewerFiltersChanged(event) {
+            var t = event && event.detail && event.detail.pic_type;
+            _pictureType = t === 'flat' || t === 'equirectangular' ? t : null;
+            if (_covLayer) { _covLayer.changed(); } // redessine le tracé avec le nouveau filtre
+        }
+
+        function _stopFollowingViewerFilters() {
+            if (_filterComposer) { _filterComposer.removeEventListener('filters-changed', _onViewerFiltersChanged); }
+            _filterComposer = null;
+            _pictureType = _pictureTypeDefault;
+        }
+
         // ============================================================
         // Recherche de la photo la plus proche + sélection dans le viewer
         // ============================================================
@@ -625,12 +705,14 @@ angular
             // par utilisateur directement dans getPicturesAroundCoordinates).
             var limit = _preferredUser ? _preferredUserCandidates : 1;
 
-            api.getPicturesAroundCoordinates(lonLat[1], lonLat[0], _searchRadius, limit)
+            _searchPictures(api, lonLat[1], lonLat[0], limit)
                 .then(function (fc) {
                     var features = (fc && fc.features) || [];
                     var feature = _pickPreferredFeature(features);
                     if (!feature) {
-                        _setStatus('Aucune photo Panoramax trouvée à cet endroit.');
+                        _setStatus(_pictureType === 'equirectangular' ? 'Aucune photo Panoramax à 360° trouvée à cet endroit.' :
+                                   _pictureType === 'flat' ? 'Aucune photo Panoramax plate trouvée à cet endroit.' :
+                                   'Aucune photo Panoramax trouvée à cet endroit.');
                         _centerViewerMap(lonLat);
                         return;
                     }
@@ -849,6 +931,9 @@ angular
             // « layer » : nom de la couche interne de la tuile, posé par ol.format.MVT.
             return function (feature, resolution) {
                 var layer = feature.get('layer');
+                // Type de photos choisi : propriété « type » (equirectangular / flat), comme le viewer.
+                if (_pictureType && (layer === 'sequences' || layer === 'pictures') &&
+                    feature.get('type') !== _pictureType) { return null; }
                 if (layer === 'sequences') { return seq; }
                 if (layer === 'pictures' && resolution <= _PICTURES_MAX_RES) { return pic; }
                 return null; // « grid » (statistiques des petits zooms) : non dessinée

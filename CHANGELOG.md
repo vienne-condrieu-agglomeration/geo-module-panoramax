@@ -11,6 +11,12 @@ la plus récente publiée doit être celle de `package.json` et de `src/plugin.g
 
 ## [Non publié]
 
+## [1.12.0] — 2026-11-12
+
+### Ajouté
+
+- Un nouveau réglage « Type de photos affichées au démarrage » permet de ne montrer par défaut que les photos à 360° (ou que les photos plates). Il s'applique à la mini-carte du visualiseur, aux séquences affichées sur la carte GEO et à la recherche de la photo la plus proche d'un clic ; l'utilisateur peut ensuite modifier le filtre de la mini-carte lui-même
+
 ## [1.11.0] — 2026-11-09
 
 ### Ajouté

@@ -1,7 +1,7 @@
 {
   "name": "geo.panoramax",
   "displayName": "Vue immersive Panoramax",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "minGeoVersion": "3.2.0",
   "author": "fallamanche@vienne-condrieu-agglomeration.fr",
   "allowMultiple": false,
@@ -135,6 +135,20 @@
           "required": false,
           "type": "BOOLEAN",
           "defaultValue": false
+        },
+        {
+          "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
+          "name": "Type de photos affichées au démarrage",
+          "description": "Filtre appliqué à l'ouverture du panneau : sur la mini-carte du visualiseur, sur les séquences affichées sur la carte GEO et dans la recherche de la photo la plus proche d'un clic. « Photos 360° uniquement » masque les photos plates. L'utilisateur peut ensuite changer le filtre de la mini-carte dans le visualiseur.",
+          "key": "pictureType",
+          "required": false,
+          "type": "ENUMERATED",
+          "values": [
+            "Toutes les photos",
+            "Photos 360° uniquement",
+            "Photos plates uniquement"
+          ],
+          "defaultValue": "Toutes les photos"
         },
         {
           "@type": "com.bg.functionality.canvas.configuration.PropertyConfigurationElement",
